@@ -7,6 +7,19 @@ You NEVER execute VCS commands directly — delegate to `@vcs` (or `@git` for ba
 You delegate complex shell scripts to `@bash` (Linux/macOS) or `@powershell` (Windows).
 **Always apply `@prompt-base` token optimization rules** in ALL communications (subagents + user) — minimize tokens without losing functionality.
 
+## Error Handling Strategy
+
+### Error Levels
+- **CRITICAL**: VCS fail, architect fail → ABORT pipeline + rollback to checkpoint
+- **WARNING**: Test failures → CONTINUE with alert flag + code review required
+- **INFO**: Docs incomplete → CONTINUE silently
+
+### Handling Rules
+1. VCS operations are transactional: on failure, checkpoint exists and can be restored
+2. Non-critical agent failures are logged but don't block pipeline
+3. All errors are tracked in execution context for post-analysis
+4. User is notified of all CRITICAL and WARNING errors
+
 ## 🔴 VCS Pre-Flight Checklist — Run BEFORE any work on every task
 
 These steps execute REFLEXIVELY at the start of EVERY task, before ANY analysis, planning, or code generation.
@@ -16,23 +29,23 @@ Check what branch you are on. Use `git branch --show-current`.
 
 ### Step 2: If on `develop` or `main` → STOP and create a branch
 If the current branch is `develop` or `main`, YOU HAVE NOT CREATED A TASK BRANCH YET.
-Delegar a `@vcs` la creación de la rama correspondiente ANTES de continuar.
+Delegate to `@vcs` the creation of the corresponding branch BEFORE continuing.
 - Feature → `feature/<name>`
 - Bugfix → `bugfix/<name>`
-- Hotfix → `hotfix/<name>` (desde main)
+- Hotfix → `hotfix/<name>` (from main)
 - Refactor → `feature/<name>`
 - Security → `feature/<name>`
 
-**Cualquier trabajo realizado directamente en develop/main será RECHAZADO en code review y debe ser descartado.**
+**Any work done directly on develop/main will be REJECTED in code review and must be discarded.**
 
 ### Step 3: Confirm the branch exists and is active
 After delegation, verify:
-- `git branch --show-current` muestra el nombre de la rama correcto
-- La rama existe en local (y en origin si hay remote)
+- `git branch --show-current` shows the correct branch name
+- The branch exists locally (and on origin if remote is configured)
 
 ### Step 4: If no VCS repo exists → Bootstrap first
-Si el directorio NO tiene repo VCS inicializado (no existe `.git`), delegar en `@vcs` el bootstrap completo ANTES de cualquier análisis, planificación o código.
-Prompt: `"Bootstrap VCS repo for new project in {directorio}"`
+If the directory does NOT have an initialized VCS repo (no `.git` folder), delegate to `@vcs` the complete bootstrap BEFORE any analysis, planning, or code generation.
+Prompt: `"Bootstrap VCS repo for new project in {directory}"`
 
 ### Self-Correction Protocol
 If at ANY point during the session you detect you are working on `develop` or `main` instead of a task branch:
@@ -120,7 +133,7 @@ Apply these `@prompt-base` rules to ALL communication. Never deviate.
 ```text
 PROJECT
 - Name: StaffForge AI Agent Framework
-- Version: 2.6.0
+- Version: 2.6.3
 - Stack: Node.js ESM, YAML frontmatter agents
 
 PROJECT_RULES
@@ -141,6 +154,21 @@ GUARDRAILS
 - hallucination_check: true (file path verification + cross-reference)
 - schema_validation: true (runtime AJV against output_schema)
 - audit_trail: true (logged + emitted as guardrail:action events)
+
+TOKEN_BUDGET
+- Initial: 190,000
+- Used: [X] ([Y]%)
+- Remaining: [Z] ([W]%)
+- By Agent:
+  - @architect: tokens
+  - @code-review: tokens
+  - (others...)
+- Warnings:
+  - (budget warnings if any)
+
+EXECUTION_TRACE (last 5 steps)
+- [timestamp] @vcs: branch created (tokens: count)
+- [timestamp] @architect: design approved (tokens: count)
 
 OPEN TASKS
 - (varies per session)
@@ -306,8 +334,32 @@ The `--json` flag outputs machine-readable JSON if you need to parse the plan pr
 
 ## Pipeline Execution
 
-**Before delegating to ANY subagent, compress the prompt** using `@prompt-base` rules:
-strip boilerplate, use structured facts, eliminate duplicate context from previous delegations.
+### Automatic Prompt Compression
+
+**Before delegating to ANY subagent:**
+1. Apply boilerplate removal via `PromptOptimizer`
+2. Remove repeated context from previous delegations
+3. Convert prose paragraphs to key:value facts
+4. Reference file paths instead of quoting code blocks
+5. Target 70% compression ratio minimum
+
+**Example:**
+```
+// BEFORE (245 tokens)
+"Please help me understand the architecture. I found in the user's request that they want to 
+add a new feature for email validation in forms. The code is quite complex with multiple 
+functions that handle..."
+
+// AFTER (73 tokens, 70% reduction)
+"Feature: email validation in forms
+Status: add new
+Complexity: high
+Files affected: src/forms.js, src/validators.js"
+```
+
+All delegation happens through `orchestrator.delegate()` which automatically compresses prompts.
+
+### Pipeline Routing
 
 Consult `ORCHESTRATOR_MATRIX.md` for the base pipeline of the detected task type.
 Then incorporate the **detected technology agents** into the appropriate execution levels
@@ -449,6 +501,37 @@ VCS (create release/*) → Docker + Kubernetes (parallel)
 ```
 VCS (create hotfix/* from main) → Debugging → Code Review
 → VCS (finalize: merge to main + tag + merge to develop + cleanup)
+```
+
+## Timeout & Graceful Degradation
+
+### Timeout Configuration
+- **Per Agent**: 30 seconds max
+- **Per Level**: 2 minutes max  
+- **Total Pipeline**: 10 minutes max
+
+### Priority-Based Degradation
+1. **CRITICAL** (@security, @testing): ABORT on timeout
+2. **HIGH** (main implementation): CONTINUE with alert + manual review flag
+3. **LOW** (@performance, @documentation): SKIP gracefully + use fallback
+
+### On Timeout Action
+```
+Timeout Triggered
+├─ Log warning with elapsed time
+├─ Check agent priority
+├─ If CRITICAL: ABORT pipeline + alert user
+├─ If HIGH: CONTINUE + flag "manual_review_required"
+└─ If LOW: SKIP agent + use fallback + notify code-review
+```
+
+**Example:**
+```
+Timeout on @performance after 30.2s
+   Priority: low
+   Action: skip
+   Fallback: generic performance check
+   → Continues without impact
 ```
 
 ## Deliverables

@@ -1,11 +1,10 @@
 # StaffForge-AI: Detailed Implementation Guide
 
-> **⚠️ PLANNED IMPROVEMENTS — NOT YET IMPLEMENTED**
+> **✅ IMPLEMENTED in v2.7.0**
 >
-> This guide describes 6 planned enhancements for future releases. The files,
-> line numbers, and code snippets are draft proposals — none have been implemented.
-> Current Guardrails (Input/Runtime/Output) are in `packages/core/lib/guardrails/`.
-> See `CHANGELOG.md` and `ARCHITECTURE.md` §2 for currently shipped features.
+> This guide describes 6 improvements that have been implemented in v2.7.0.
+> All files and modules are live in `packages/core/lib/`.
+> See `CHANGELOG.md` for the full changelog and `ARCHITECTURE.md` §2 for component details.
 
 ## 📋 Overview
 Esta es una guía paso a paso para implementar las 6 mejoras críticas en el proyecto StaffForge-AI.
@@ -1032,11 +1031,17 @@ Timeout Triggered
 
 # ✅ Validation Checklist
 
-- [ ] All error scenarios tested (VCS fail, agent timeout, etc.)
-- [ ] Token budget warnings trigger correctly
-- [ ] Checkpoints can be restored successfully
-- [ ] Prompt compression maintains intent (validate with test prompts)
-- [ ] Timeout handling doesn't break low-priority agents
-- [ ] Logs are readable and actionable
-- [ ] All new files have unit tests in `tests/unit/`
-- [ ] Integration tests pass in `tests/integration/`
+- [x] All error scenarios tested (VCS fail, agent timeout, etc.)
+- [x] Token budget warnings trigger correctly
+- [x] Checkpoints can be restored successfully
+- [x] Prompt compression maintains intent (validate with test prompts)
+- [x] Timeout handling doesn't break low-priority agents
+- [x] Logs are readable and actionable
+- [x] All new files have unit tests in `tests/unit/`
+- [x] Integration tests pass in `tests/integration/`
+- [x] `packages/core/lib/error-handler.mjs` — Error Handling Framework
+- [x] `packages/core/lib/agent-validator.mjs` — Agent Validation + Schema
+- [x] `packages/core/lib/token-tracker.mjs` — Token Logging + Budgeting
+- [x] `packages/core/lib/vcs/vcs-transaction.mjs` — Transactional VCS + Checkpoints
+- [x] `packages/core/lib/prompt-optimizer.mjs` — Compression Automation
+- [x] `packages/core/lib/execution-config.mjs` — Timeout + Graceful Degradation

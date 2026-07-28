@@ -90,3 +90,37 @@ export {
   TrunkBasedWorkflow,
   CustomWorkflow,
 } from './lib/vcs/index.mjs';
+
+// ── Framework Improvements (v2.7.0) ──────────────────────────────────
+export {
+  ERROR_LEVELS,
+  ERROR_SEVERITY,
+  PipelineError,
+  handlePipelineError,
+} from './lib/error-handler.mjs';
+
+export {
+  AgentValidationError,
+  validateAgent,
+  validateAgentRegistry,
+} from './lib/agent-validator.mjs';
+
+export {
+  TokenTracker,
+} from './lib/token-tracker.mjs';
+
+export {
+  VCS_TRANSACTION_TYPES,
+  TRANSACTION_CONFIG,
+  VCSTransaction,
+} from './lib/vcs/vcs-transaction.mjs';
+
+export {
+  PromptOptimizer,
+} from './lib/prompt-optimizer.mjs';
+
+export {
+  EXECUTION_TIMEOUTS,
+  DEGRADATION_STRATEGY,
+  ExecutionLimiter,
+} from './lib/execution-config.mjs';
