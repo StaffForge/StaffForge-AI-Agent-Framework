@@ -9,7 +9,7 @@ const COMPRESSION_RULES = {
       /Can you help me/gi,
       /Would you mind/gi,
       /If possible/gi,
-      /Thank you/gi
+      /Thank you/gi,
     ];
 
     let optimized = prompt;
@@ -31,10 +31,7 @@ const COMPRESSION_RULES = {
 
   // 3. Reference file paths instead of quoting
   replaceQuotesWithReferences: (prompt) => {
-    return prompt.replace(
-      /I found this code:[\s\S]*?function/,
-      'Code in src/auth.js:15-42: function'
-    );
+    return prompt.replace(/I found this code:[\s\S]*?function/, 'Code in src/auth.js:15-42: function');
   },
 
   // 4. Compress repeated context
@@ -45,14 +42,12 @@ const COMPRESSION_RULES = {
     const prevSentences = previous.split(/[.!?]/);
     const currSentences = current.split(/[.!?]/);
 
-    const newInfo = currSentences.filter(sentence => {
-      return !prevSentences.some(prev =>
-        similarity(sentence.trim(), prev.trim()) > 0.8
-      );
+    const newInfo = currSentences.filter((sentence) => {
+      return !prevSentences.some((prev) => similarity(sentence.trim(), prev.trim()) > 0.8);
     });
 
     return newInfo.join('. ').trim();
-  }
+  },
 };
 
 export class PromptOptimizer {
@@ -62,10 +57,10 @@ export class PromptOptimizer {
 
   async optimize(prompt, options = {}) {
     const {
-      targetReduction = 0.70,    // 70% target
+      targetReduction = 0.7, // 70% target
       preserveIntent = true,
       validateSchema = true,
-      previousContext = null
+      previousContext = null,
     } = options;
 
     let optimized = prompt;
@@ -80,8 +75,10 @@ export class PromptOptimizer {
 
     // 3. Validate compression ratio
     const ratio = optimized.length / prompt.length;
-    if (ratio > (1 - targetReduction)) {
-      console.warn(`Compression ratio ${(ratio * 100).toFixed(1)}% exceeds target ${(targetReduction * 100).toFixed(1)}%`);
+    if (ratio > 1 - targetReduction) {
+      console.warn(
+        `Compression ratio ${(ratio * 100).toFixed(1)}% exceeds target ${(targetReduction * 100).toFixed(1)}%`,
+      );
     }
 
     return {
@@ -89,7 +86,7 @@ export class PromptOptimizer {
       optimized,
       ratio: ratio,
       savings: prompt.length - optimized.length,
-      targetAchieved: ratio <= (1 - targetReduction)
+      targetAchieved: ratio <= 1 - targetReduction,
     };
   }
 }

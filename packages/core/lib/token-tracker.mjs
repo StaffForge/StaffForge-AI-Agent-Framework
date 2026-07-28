@@ -26,18 +26,18 @@ export class TokenTracker {
       agent: agentName,
       tokens: tokensUsed,
       remaining: this.remaining,
-      percentage: ((this.used / this.initialBudget) * 100).toFixed(1)
+      percentage: ((this.used / this.initialBudget) * 100).toFixed(1),
     });
 
     // Warning if exceeding expected percentage
     const expectedPercent = 10; // 10% per major agent
-    const actualPercent = ((this.byAgent[agentName] / this.initialBudget) * 100);
+    const actualPercent = (this.byAgent[agentName] / this.initialBudget) * 100;
     if (actualPercent > expectedPercent) {
       this.warnings.push({
         agent: agentName,
         expected: expectedPercent,
         actual: actualPercent.toFixed(1),
-        message: `${agentName} consumed ${actualPercent.toFixed(1)}% of budget (expected: ${expectedPercent}%)`
+        message: `${agentName} consumed ${actualPercent.toFixed(1)}% of budget (expected: ${expectedPercent}%)`,
       });
     }
 
@@ -45,7 +45,7 @@ export class TokenTracker {
     if (this.remaining / this.initialBudget < 0.1) {
       this.warnings.push({
         level: 'CRITICAL',
-        message: `Critical: Only ${((this.remaining / this.initialBudget) * 100).toFixed(1)}% of token budget remaining!`
+        message: `Critical: Only ${((this.remaining / this.initialBudget) * 100).toFixed(1)}% of token budget remaining!`,
       });
     }
   }
@@ -58,9 +58,9 @@ export class TokenTracker {
         remaining: this.remaining,
         percentageUsed: ((this.used / this.initialBudget) * 100).toFixed(1),
         by_agent: this.byAgent,
-        warnings: this.warnings
+        warnings: this.warnings,
       },
-      EXECUTION_TRACE: this.trace.slice(-10) // Last 10 entries
+      EXECUTION_TRACE: this.trace.slice(-10), // Last 10 entries
     };
   }
 

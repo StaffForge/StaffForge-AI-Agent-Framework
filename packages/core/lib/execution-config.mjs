@@ -1,9 +1,9 @@
 // packages/core/lib/execution-config.mjs
 
 export const EXECUTION_TIMEOUTS = {
-  perAgent: 30000,          // 30 seconds per agent
-  perLevel: 120000,         // 2 minutes per level
-  totalPipeline: 600000     // 10 minutes total
+  perAgent: 30000, // 30 seconds per agent
+  perLevel: 120000, // 2 minutes per level
+  totalPipeline: 600000, // 10 minutes total
 };
 
 export const DEGRADATION_STRATEGY = {
@@ -12,24 +12,24 @@ export const DEGRADATION_STRATEGY = {
       priority: 'low',
       action: 'skip',
       notifyAgent: '@code-review',
-      fallback: 'generic performance check'
+      fallback: 'generic performance check',
     },
     '@testing': {
       priority: 'high',
-      action: 'ABORT',  // Never skip testing
-      notifyAgent: null
+      action: 'ABORT', // Never skip testing
+      notifyAgent: null,
     },
     '@documentation': {
       priority: 'low',
       action: 'skip',
       notifyAgent: 'user',
-      fallback: 'auto-generated docs'
+      fallback: 'auto-generated docs',
     },
     '@security': {
       priority: 'critical',
       action: 'ABORT',
-      notifyAgent: null
-    }
+      notifyAgent: null,
+    },
   },
 
   onTimeout(agentName, elapsedMs) {
@@ -52,12 +52,12 @@ export const DEGRADATION_STRATEGY = {
       return {
         action: 'skip',
         fallback: config.fallback,
-        notifyAgent: config.notifyAgent
+        notifyAgent: config.notifyAgent,
       };
     }
 
     return { action: 'CONTINUE' };
-  }
+  },
 };
 
 export class ExecutionLimiter {
@@ -82,7 +82,7 @@ export class ExecutionLimiter {
         this.skippedAgents.push({
           agent: agentName,
           reason: 'timeout',
-          fallback: degradation.fallback
+          fallback: degradation.fallback,
         });
       } else if (degradation.action === 'ABORT') {
         throw new Error(`Agent timeout (critical): ${agentName} took ${(elapsed / 1000).toFixed(1)}s`);
@@ -105,7 +105,7 @@ export class ExecutionLimiter {
       totalExecutionTime: `${(totalTime / 1000).toFixed(1)}s`,
       timeoutLimit: `${(this.timeouts.totalPipeline / 1000).toFixed(1)}s`,
       skippedAgents: this.skippedAgents,
-      status: totalTime > this.timeouts.totalPipeline ? 'TIMEOUT' : 'OK'
+      status: totalTime > this.timeouts.totalPipeline ? 'TIMEOUT' : 'OK',
     };
   }
 }
@@ -113,5 +113,5 @@ export class ExecutionLimiter {
 export default {
   EXECUTION_TIMEOUTS,
   DEGRADATION_STRATEGY,
-  ExecutionLimiter
+  ExecutionLimiter,
 };

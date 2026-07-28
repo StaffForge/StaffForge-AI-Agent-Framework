@@ -114,7 +114,7 @@ async function main() {
   console.log('');
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Pipeline execution error:', err.message);
   process.exit(1);
 });
