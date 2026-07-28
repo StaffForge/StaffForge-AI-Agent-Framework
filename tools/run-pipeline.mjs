@@ -70,13 +70,13 @@ function parseArgs() {
   return opts;
 }
 
-function main() {
+async function main() {
   const opts = parseArgs();
   const taskType = opts.task;
   const prompt = opts.prompt || '';
 
   const executor = getPipelineExecutor();
-  const result = executor.execute(taskType, prompt, {
+  const result = await executor.execute(taskType, prompt, {
     selectModel: !opts.noModel,
     provider: opts.provider || null,
     enableTelemetry: opts.telemetry || false,
@@ -114,4 +114,7 @@ function main() {
   console.log('');
 }
 
-main();
+main().catch(err => {
+  console.error('Pipeline execution error:', err.message);
+  process.exit(1);
+});
