@@ -3,25 +3,25 @@
 export const VCS_TRANSACTION_TYPES = {
   BRANCH_CREATE: 'branch-create',
   CODE_COMMIT: 'code-commit',
-  FINAL_MERGE: 'final-merge'
+  FINAL_MERGE: 'final-merge',
 };
 
 export const TRANSACTION_CONFIG = {
   [VCS_TRANSACTION_TYPES.BRANCH_CREATE]: {
     idempotent: true,
     rollback: 'delete branch',
-    checkpoint: false
+    checkpoint: false,
   },
   [VCS_TRANSACTION_TYPES.CODE_COMMIT]: {
     idempotent: false,
     checkpoint: true,
-    rollback: 'revert commit'
+    rollback: 'revert commit',
   },
   [VCS_TRANSACTION_TYPES.FINAL_MERGE]: {
     idempotent: false,
     checkpoint: true,
-    rollback: 'revert merge + recreate branch'
-  }
+    rollback: 'revert merge + recreate branch',
+  },
 };
 
 export class VCSTransaction {
@@ -40,7 +40,7 @@ export class VCSTransaction {
       this.checkpoints.push({
         name: checkpointName,
         timestamp: new Date().toISOString(),
-        status: 'created'
+        status: 'created',
       });
       console.log(`Checkpoint created: ${checkpointName}`);
       return checkpointName;
@@ -72,7 +72,7 @@ export class VCSTransaction {
         timestamp: new Date().toISOString(),
         status: 'SUCCESS',
         checkpoint,
-        result
+        result,
       });
 
       return result;
@@ -87,7 +87,7 @@ export class VCSTransaction {
         timestamp: new Date().toISOString(),
         status: 'FAILED',
         checkpoint,
-        error: error.message
+        error: error.message,
       });
 
       throw error;
@@ -114,7 +114,7 @@ export class VCSTransaction {
     return {
       transactions: this.transactions,
       checkpoints: this.checkpoints,
-      isRolledBack: this.isRolledBack
+      isRolledBack: this.isRolledBack,
     };
   }
 }

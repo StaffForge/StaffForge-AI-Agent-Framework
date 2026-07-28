@@ -1,15 +1,15 @@
 // packages/core/lib/error-handler.mjs
 
 export const ERROR_LEVELS = {
-  CRITICAL: 'critical',    // VCS fail, architect fail → ABORT
-  WARNING: 'warning',      // Test fail → CONTINUE_ALERT
-  INFO: 'info'             // Docs incomplete → CONTINUE
+  CRITICAL: 'critical', // VCS fail, architect fail → ABORT
+  WARNING: 'warning', // Test fail → CONTINUE_ALERT
+  INFO: 'info', // Docs incomplete → CONTINUE
 };
 
 export const ERROR_SEVERITY = {
   [ERROR_LEVELS.CRITICAL]: { action: 'ABORT', notify: ['user', 'logs'], rollback: true },
   [ERROR_LEVELS.WARNING]: { action: 'CONTINUE_ALERT', notify: ['agent'], flag: 'review_required' },
-  [ERROR_LEVELS.INFO]: { action: 'CONTINUE', notify: ['logger'] }
+  [ERROR_LEVELS.INFO]: { action: 'CONTINUE', notify: ['logger'] },
 };
 
 export class PipelineError extends Error {
@@ -43,7 +43,7 @@ export async function handlePipelineError(error, taskName, pipelineState) {
       severity: error.level,
       message: error.message,
       context: error.context,
-      requiresReview: true
+      requiresReview: true,
     });
   }
 
@@ -59,5 +59,5 @@ export default {
   ERROR_LEVELS,
   ERROR_SEVERITY,
   PipelineError,
-  handlePipelineError
+  handlePipelineError,
 };

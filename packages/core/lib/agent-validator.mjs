@@ -13,8 +13,8 @@ const AGENT_SCHEMA = {
     description: { type: 'string' },
     tools: { type: 'object' },
     capabilities: { type: 'array' },
-    keywords: { type: 'array', items: { type: 'string' } }
-  }
+    keywords: { type: 'array', items: { type: 'string' } },
+  },
 };
 
 export class AgentValidationError extends Error {
@@ -34,23 +34,15 @@ export async function validateAgent(agentName, agentPath) {
     // 2. Parse YAML frontmatter
     const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (!yamlMatch) {
-      throw new AgentValidationError(
-        agentName,
-        'Missing YAML frontmatter',
-        ['---...---']
-      );
+      throw new AgentValidationError(agentName, 'Missing YAML frontmatter', ['---...---']);
     }
 
     const agentSpec = parseYAML(yamlMatch[1]);
 
     // 3. Validate required fields
-    const missing = AGENT_SCHEMA.required.filter(field => !agentSpec[field]);
+    const missing = AGENT_SCHEMA.required.filter((field) => !agentSpec[field]);
     if (missing.length > 0) {
-      throw new AgentValidationError(
-        agentName,
-        `Missing required fields: ${missing.join(', ')}`,
-        missing
-      );
+      throw new AgentValidationError(agentName, `Missing required fields: ${missing.join(', ')}`, missing);
     }
 
     // 4. Validate types
@@ -59,7 +51,7 @@ export async function validateAgent(agentName, agentPath) {
         if (fieldSchema.enum && !fieldSchema.enum.includes(agentSpec[field])) {
           throw new AgentValidationError(
             agentName,
-            `Invalid value for "${field}": must be one of ${fieldSchema.enum.join(', ')}`
+            `Invalid value for "${field}": must be one of ${fieldSchema.enum.join(', ')}`,
           );
         }
       }
@@ -89,9 +81,12 @@ function parseYAML(content) {
         // Basic object parsing
         const objMatch = value.match(/\{([^}]+)\}/);
         if (objMatch) {
-          const pairs = objMatch[1].split(',').map(p => p.trim()).filter(Boolean);
+          const pairs = objMatch[1]
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean);
           for (const pair of pairs) {
-            const [k, v] = pair.split(':').map(s => s.trim());
+            const [k, v] = pair.split(':').map((s) => s.trim());
             result[key][k] = v === 'true' ? true : v === 'false' ? false : v;
           }
         }
@@ -99,7 +94,11 @@ function parseYAML(content) {
         try {
           result[key] = JSON.parse(value);
         } catch {
-          result[key] = value.replace(/[\[\]'"]/g, '').split(',').map(s => s.trim()).filter(Boolean);
+          result[key] = value
+            .replace(/[\[\]'"]/g, '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
         }
       } else if (value === 'true' || value === 'false') {
         result[key] = value === 'true';
@@ -117,7 +116,7 @@ export async function validateAgentRegistry(agentsPath) {
   const results = {
     valid: [],
     invalid: [],
-    errors: []
+    errors: [],
   };
 
   for (const [name, path] of agents) {
@@ -154,5 +153,5 @@ export default {
   validateAgent,
   validateAgentRegistry,
   AGENT_SCHEMA,
-  parseYAML
+  parseYAML,
 };

@@ -122,7 +122,9 @@ export class VCSManager {
       // Cleanup on failure (ignore cleanup errors)
       try {
         await this._exec('deleteBranch', branchName);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       throw error;
     }
   }

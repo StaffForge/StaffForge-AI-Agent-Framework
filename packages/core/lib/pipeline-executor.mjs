@@ -197,9 +197,10 @@ export class PipelineExecutor {
           try {
             await this.validateAgentBeforeDelegation(agentId);
           } catch (validationError) {
-            const pipelineErr = validationError instanceof AgentValidationError
-              ? new PipelineError(validationError.message, ERROR_LEVELS.WARNING, { agentId })
-              : new PipelineError(validationError.message, ERROR_LEVELS.CRITICAL, { agentId });
+            const pipelineErr =
+              validationError instanceof AgentValidationError
+                ? new PipelineError(validationError.message, ERROR_LEVELS.WARNING, { agentId })
+                : new PipelineError(validationError.message, ERROR_LEVELS.CRITICAL, { agentId });
 
             const severity = await handlePipelineError(pipelineErr, agentId, pipelineState);
             if (severity.action === 'ABORT') {
@@ -211,8 +212,10 @@ export class PipelineExecutor {
           eventBus.emit('agent:complete', { ...ctx, agentId, level: i + 1, duration: 0 });
           eventBus.emit('subagent:complete', { ...ctx, subagentType: agentId, level: i + 1, duration: 0 });
         } catch (error) {
-          const pipelineErr = error instanceof PipelineError ? error
-            : new PipelineError(error.message, ERROR_LEVELS.CRITICAL, { agentId });
+          const pipelineErr =
+            error instanceof PipelineError
+              ? error
+              : new PipelineError(error.message, ERROR_LEVELS.CRITICAL, { agentId });
           const severity = await handlePipelineError(pipelineErr, agentId, pipelineState);
           levelErrors.push({ agent: agentId, error: pipelineErr, severity });
           eventBus.emit('agent:error', { ...ctx, agentId, level: i + 1, error: error.message });
@@ -271,24 +274,16 @@ export class PipelineExecutor {
       return { valid: true, spec: { id: agentName } };
     }
 
-    const agentPath = this._agentRegistry.getAgentPath
-      ? this._agentRegistry.getAgentPath(agentName)
-      : null;
+    const agentPath = this._agentRegistry.getAgentPath ? this._agentRegistry.getAgentPath(agentName) : null;
 
     if (!agentPath) {
-      throw new AgentValidationError(
-        agentName,
-        `Agent not found in registry: ${agentName}`
-      );
+      throw new AgentValidationError(agentName, `Agent not found in registry: ${agentName}`);
     }
 
     const validation = await validateAgent(agentName, agentPath);
 
     if (!validation.valid) {
-      throw new AgentValidationError(
-        agentName,
-        `Agent validation failed: missing capabilities`
-      );
+      throw new AgentValidationError(agentName, `Agent validation failed: missing capabilities`);
     }
 
     return validation.spec;
@@ -303,7 +298,7 @@ export class PipelineExecutor {
       agent: agentSpec,
       prompt,
       delegated: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
