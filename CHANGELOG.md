@@ -1,5 +1,27 @@
 # Changelog
 
+## [v2.7.0] — 2026-07-28
+
+### Added
+- **Error Handling Framework** (MEJORA 1): `packages/core/lib/error-handler.mjs` — PipelineError, ERROR_LEVELS (CRITICAL/WARNING/INFO), handlePipelineError with abort/continue-alert/continue semantics
+- **Agent Validation + Schema** (MEJORA 2): `packages/core/lib/agent-validator.mjs` — validateAgent, validateAgentRegistry, AgentValidationError, YAML frontmatter parser with field validation
+- **Token Logging + Budgeting** (MEJORA 3): `packages/core/lib/token-tracker.mjs` — TokenTracker with per-agent tracking, budget warnings, execution trace, markdown report
+- **Transactional VCS + Checkpoints** (MEJORA 4): `packages/core/lib/vcs/vcs-transaction.mjs` — VCSTransaction, checkpoint creation, rollback support, transactional branch/merge operations
+- **Prompt Compression Automation** (MEJORA 5): `packages/core/lib/prompt-optimizer.mjs` — PromptOptimizer with boilerplate removal, deduplication, target 70% compression
+- **Timeout + Graceful Degradation** (MEJORA 6): `packages/core/lib/execution-config.mjs` — ExecutionLimiter, DEGRADATION_STRATEGY with priority-based agent timeout handling
+- PipelineExecutor updated with error handling in level execution and agent validation pre-delegation
+- VCSManager updated with transactional methods (createTagWithCheckpoint, createBranchWithTransaction, mergeBranchWithTransaction)
+- Orchestrator agent updated with Error Handling Strategy, Token Budget tracking, Automatic Prompt Compression, and Timeout & Graceful Degradation sections
+- Integration tests for all 6 new modules (error-handler, agent-validator, token-tracker, vcs-transaction, prompt-optimizer, execution-config)
+
+### Changed
+- PipelineExecutor: executeLevel wrapped with try/catch + handlePipelineError for error-resilient execution
+- PipelineExecutor: added validateAgentBeforeDelegation() and delegate() methods for pre-flight agent validation
+- VCSManager: added transactional VCS helper methods
+- Orchestrator.md: enriched with 4 new procedural sections
+- Version bumped from 2.6.3 → 2.7.0
+- ARCHITECTURE.md: new modules added to component tables
+
 ## [v2.6.0] — 2026-07-17
 
 ### Added
