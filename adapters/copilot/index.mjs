@@ -1,21 +1,24 @@
 /**
  * GitHub Copilot adapter — generates:
- *   .github/copilot-instructions.md              (neutral project context — does NOT override @ask/@plan)
+ *   .github/copilot-instructions.md              (orchestrator's full prompt — makes it the DEFAULT agent)
  *   .github/agents/*.agent.md                    (ALL agents @mention-able, including orchestrator)
  *   .github/instructions/<skill>.instructions.md  (Skills as topic-specific instructions)
  *
  * Accepts skills as second parameter.
  *
- * IMPORTANT: copilot-instructions.md MUST remain NEUTRAL — it has applyTo: "**" which
- * applies to ALL Copilot conversations. If it says "you are the orchestrator", it
- * overrides @ask (default chat), @plan, and every other built-in agent.
- * The orchestrator (and all other agents) exist ONLY as .agent.md files in
- * .github/agents/ — they are @mention-able alongside @ask, @plan, and @workspace.
+ * ARCHITECTURE (per AGENTS.md Copilot Architecture):
+ *   Layer 1 — copilot-instructions.md (default agent)
+ *     Contains the orchestrator's full prompt — makes @orchestrator the default
+ *     chat experience. Has applyTo: "**" → applies to ALL Copilot conversations.
+ *     Built-in agents (@ask, @plan, @workspace) remain in the dropdown but share
+ *     the orchestrator's base context as instructions.
  *
- * Per GitHub Copilot conventions:
- * - copilot-instructions.md applies to EVERY conversation — keep it generic
- * - .github/agents/*.agent.md files create @mention-able custom agents
- * - .github/instructions/*.instructions.md files apply to matching file globs
+ *   Layer 2 — .github/agents/*.agent.md (all agents @mention-able)
+ *     Every agent gets its own .agent.md. All 150+ agents are @mention-able
+ *     alongside @ask, @plan, and @workspace.
+ *
+ *   Layer 3 — .github/instructions/*.instructions.md (skills)
+ *     Load conditionally based on file glob patterns.
  */
 
 function mapTools(frontmatter) {
@@ -52,27 +55,30 @@ function buildAgentFrontmatter(agent) {
 export default function copilotAdapter(agents, skills = []) {
   const files = [];
 
-  // ── 1. copilot-instructions.md — NEUTRAL project context ───────────────
-  // CRITICAL: This file has applyTo: "**" which applies to EVERY Copilot
-  // conversation. If we put "you are the orchestrator" here, it overrides
-  // @ask (default chat), @plan, and ALL built-in agents.
-  // This file MUST remain neutral — just project-level context.
+  // ── 1. copilot-instructions.md — orchestrator as DEFAULT agent ─────────
+  // Per AGENTS.md Copilot Architecture — Layer 1:
+  // Contains the orchestrator's full prompt — makes @orchestrator the default
+  // chat experience. Has applyTo: "**" → applies to ALL Copilot conversations.
+  // Tradeoff: built-in agents (@ask, @plan, @workspace) remain in the dropdown
+  // but share the orchestrator's base context.
+  const orchestrator = agents.find((a) => a.id === 'orchestrator');
+  const instructionsBody = orchestrator
+    ? orchestrator.body
+    : 'StaffForge AI Agent Framework — Multi-provider agent system.';
   files.push({
     path: '.github/copilot-instructions.md',
     content: `---
 applyTo: "**"
 ---
 
-StaffForge AI Agent Framework — Multi-provider agent system.
-Use @orchestrator for multi-agent pipeline execution.
-Technology agents (@python, @typescript, @react, etc.) are available via @mention.
+${instructionsBody}
 `,
   });
 
   // ── 2. .github/agents/<name>.agent.md — ALL agents @mention-able ──────
   // Every agent gets its own .agent.md so it can be @mentioned directly.
   // Built-in Copilot agents (@ask, @plan, @workspace) remain available
-  // because we do NOT override copilot-instructions.md with agent identity.
+  // in the @mention dropdown alongside custom agents.
   for (const agent of agents) {
     const frontmatter = buildAgentFrontmatter(agent);
     files.push({
