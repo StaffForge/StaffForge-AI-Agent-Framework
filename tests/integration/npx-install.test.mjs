@@ -52,9 +52,19 @@ function cleanup() {
 
 /**
  * Clone the repo to a temp "cache" dir, simulating what npx does.
+ *
+ * Uses `file://` protocol to clone from the local checkout. In CI (PR context),
+ * the `develop` branch may only exist as `origin/develop` without a local ref,
+ * so we ensure it exists locally before cloning.
  */
 function cloneRepo(targetDir) {
   console.log(`  cloning repo → ${targetDir}`);
+  // Ensure local 'develop' branch exists (CI PR checkouts may only have origin/develop)
+  const branches = execSync('git branch', { cwd: REPO_ROOT, encoding: 'utf-8', stdio: 'pipe' });
+  if (!branches.split('\n').some((b) => b.trim() === 'develop')) {
+    execSync('git branch develop origin/develop', { cwd: REPO_ROOT, stdio: 'pipe' });
+    console.log('  created local develop branch from origin/develop');
+  }
   execSync(`git clone --depth 1 --branch develop "file://${REPO_ROOT}" "${targetDir}"`, {
     stdio: 'pipe',
     timeout: 60000,
