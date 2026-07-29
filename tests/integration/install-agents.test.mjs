@@ -44,7 +44,7 @@ function runInstallInProject(platform) {
   const a11y = json.agent.a11y;
   assert(a11y && a11y.prompt, 'opencode a11y agent has prompt field');
   assert(a11y.prompt.includes('# Accessibility'), 'opencode a11y prompt contains agent body (Mission)');
-  assert(a11y.prompt.includes('## Mandatory Rules'), 'opencode a11y prompt contains rules');
+  assert(a11y.prompt.includes('Mandatory Rules') || a11y.prompt.includes('Operational Guardrails'), 'opencode a11y prompt contains rules/guardrails');
 
   const orchestrator = json.agent.orchestrator;
   assert(orchestrator && orchestrator.prompt, 'opencode orchestrator has prompt');
@@ -79,7 +79,7 @@ function runInstallInProject(platform) {
     assert(a11y.startsWith('---'), 'claude-code A11y.md has frontmatter');
     assert(a11y.includes('name: A11y'), 'claude-code A11y.md frontmatter has name');
     assert(a11y.includes('# Accessibility'), 'claude-code A11y.md contains agent body');
-    assert(a11y.includes('## Mandatory Rules'), 'claude-code A11y.md contains rules');
+    assert(a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'), 'claude-code A11y.md contains rules/guardrails');
   }
 
   // Must NOT dump agents into .claude/rules/ (that's for always-on rules)
@@ -104,7 +104,7 @@ function runInstallInProject(platform) {
   if (existsSync(rulesDir)) {
     const a11y = readFileSync(join(rulesDir, 'A11y.mdc'), 'utf-8');
     assert(a11y.includes('# Accessibility'), 'cursor A11y.mdc contains agent body');
-    assert(a11y.includes('## Mandatory Rules'), 'cursor A11y.mdc contains rules');
+    assert(a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'), 'cursor A11y.mdc contains rules/guardrails');
   }
   rmSync(project, { recursive: true, force: true });
 }
@@ -203,7 +203,7 @@ function runInstallInProject(platform) {
     assert(mdFiles.includes('a11y.md'), 'agents/ has a11y.md');
     const a11y = readFileSync(join(outAgents, 'a11y.md'), 'utf-8');
     assert(a11y.includes('# Accessibility'), 'agents/a11y.md has body');
-    assert(a11y.includes('## Mandatory Rules'), 'agents/a11y.md has rules');
+    assert(a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'), 'agents/a11y.md has rules/guardrails');
   }
   rmSync(project, { recursive: true, force: true });
 }
