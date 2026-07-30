@@ -60,8 +60,10 @@ function cleanup() {
 function cloneRepo(targetDir) {
   console.log(`  cloning repo → ${targetDir}`);
   // Ensure local 'develop' branch exists (CI PR checkouts may only have origin/develop)
+  // Normalize: strip the '*' active-branch marker so this works on any branch
   const branches = execSync('git branch', { cwd: REPO_ROOT, encoding: 'utf-8', stdio: 'pipe' });
-  if (!branches.split('\n').some((b) => b.trim() === 'develop')) {
+  const hasDevelop = branches.split('\n').some((b) => b.replace('*', '').trim() === 'develop');
+  if (!hasDevelop) {
     execSync('git branch develop origin/develop', { cwd: REPO_ROOT, stdio: 'pipe' });
     console.log('  created local develop branch from origin/develop');
   }
