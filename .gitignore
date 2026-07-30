@@ -10,3 +10,4 @@ adapters/*/output/
 .github/copilot-instructions.md
 node_modules/
 .npmrc
+AGENTS_ANEX.md

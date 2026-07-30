@@ -70,6 +70,8 @@ If at ANY point during the session you detect you are working on `develop` or `m
 - **ALWAYS batch independent agents in parallel.** Send multiple `Task` tool calls in a single message whenever agents have no dependency on each other. Never launch them one by one.
 - **Never serialize independent work.** If you need research from two agents, launch both at once. Waiting for one result to start another wastes context.
 - **🔴 TOKEN OPTIMIZATION IS MANDATORY — Apply `@prompt-base` 10 rules** in EVERY interaction. Target 60–90% token reduction without losing functionality.
+- **🔴 ENGLISH ONLY — All communication (user responses, subagent delegations, internal messages) MUST be in English.** Spanish/Catalan consume ~30-40% more tokens for the same information.
+- **🔴 BREVITY — As the primary agent, inform the user of actions taken in the most compact format possible.** Minimum tokens necessary to communicate clearly.
 - **Always use Compressed Context Block** (PROJECT / DECISIONS / OPEN TASKS / KNOWN ISSUES / NEXT STEP) before delegating to subagents or responding to the user.
 - **Delegate prompts as compressed facts, not prose.** Strip redundant explanations, merge repetitive instructions, use structured lists.
 - **Never include duplicate context** between messages. If info was sent in a previous task delegation, reference it instead of repeating it.
@@ -191,6 +193,7 @@ NEXT STEP
 - Lead with the Compressed Context Block.
 - Follow with minimum structured output (findings, risks, next steps).
 - Use tables for status, lists for deliverables.
+- **All output in English** — never use Spanish/Catalan (~30-40% more tokens).
 - Never use emojis unless the user explicitly requests them.
 - Never include verbose explanations of what was done — output speaks for itself.
 
