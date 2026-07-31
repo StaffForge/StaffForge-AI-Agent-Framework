@@ -51,7 +51,16 @@ const INJECTION_PATTERNS = [
   // Executable instruction injection
   { pattern: /run\s+(the\s+)?following\s+(command|instruction|code)/gi, severity: 'high', category: 'exec-injection' },
   { pattern: /execute\s+(the\s+)?following/gi, severity: 'high', category: 'exec-injection' },
-  { pattern: /```[\s\S]*?(system|bash|shell|exec|eval|sudo)\s*\n/gi, severity: 'medium', category: 'exec-injection' },
+  // Fenced code block with a shell keyword on the fence line (language tag)
+  // or on the line right after the fence. Anchored to line starts (^ /m) and
+  // width-bounded per line — linear even on adversarial inputs (many fences,
+  // no newlines, huge lines).
+  {
+    pattern:
+      /^```[^\n]{0,100}(?:\b(?:system|bash|shell|exec|eval|sudo)\b[^\n]{0,100}\n|[^\n]{0,100}\n[^\n]{0,100}\b(?:system|bash|shell|exec|eval|sudo)\b[^\n]{0,100}\n)/gim,
+    severity: 'medium',
+    category: 'exec-injection',
+  },
 
   // Meta-instruction extraction attempts
   { pattern: /print\s+(your|the)\s+(system\s+)?prompt/gi, severity: 'critical', category: 'prompt-extraction' },
@@ -124,9 +133,13 @@ export function sanitizeInput(content, options = {}) {
         };
       }
 
-      // Tag the injection point with [⚠ INJECTION DETECTED]
+      // Tag the injection point with [⚠ INJECTION DETECTED].
+      // The payload is scrubbed of `]`, CR and LF so downstream consumers can
+      // always parse the marker unambiguously (a multi-line match must never
+      // leak its remaining lines as visible text after marker truncation).
       sanitized = sanitized.replace(entry.pattern, (match) => {
-        return `[⚠ INJECTION DETECTED: ${match.slice(0, 60)}]`;
+        const payload = match.replace(/[\r\n\]]/g, ' ').slice(0, 60);
+        return `[⚠ INJECTION DETECTED: ${payload}]`;
       });
     }
   }
