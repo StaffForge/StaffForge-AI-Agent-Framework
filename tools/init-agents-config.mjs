@@ -5,11 +5,18 @@
  *
  * Implements the AGENTS Configuration Framework specification:
  *   §2.1  File Management Strategy (Scenario A: AGENTS.md / Scenario B: AGENTS_ANEX.md)
- *   §3    Interactive Configuration Questionnaire (5 modules)
+ *   §3    Interactive Configuration Questionnaire (8 modules)
  *   §4.1  AGENTS.md template
  *   §5.1  AGENTS_ANEX.md template
  *   §6.1  Initialization Sequence
  *   §6.2  Validation Rules
+ *
+ * The 5 legacy modules (stack, conventions, rules, workflow, docs) return
+ * markdown section bodies. The 3 spec blocks (Context, Guardrails, Output
+ * Format) return structured objects under data.spec that are rendered into
+ * high-density markdown tables at template time. Free-text answers are
+ * sanitized against prompt-injection patterns and secret leakage before
+ * rendering (securityPass stage).
  *
  * Zero external dependencies. Usable both as a standalone CLI
  * (`node tools/init-agents-config.mjs [--yes] [--out <dir>]`) and as an
@@ -17,7 +24,7 @@
  *
  * Options:
  *   --out <dir>   Target project directory (default: CWD)
- *   --yes, -y     Non-interactive: use framework defaults for all 5 modules
+ *   --yes, -y     Non-interactive: use framework defaults for all 8 modules
  *   --help, -h    Show help
  */
 
@@ -26,6 +33,9 @@ import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { env, argv, exit, cwd } from 'node:process';
+// Reuse the canonical guardrail pattern lists (zero deps, single source of truth).
+import { sanitizeInput } from '../packages/core/lib/guardrails/input-sanitizer.mjs';
+import { scanSecrets } from '../packages/core/lib/guardrails/output-dlp.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CWD = cwd();
@@ -48,6 +58,17 @@ OPTIONS
 BEHAVIOR (spec §2.1)
   If AGENTS.md does not exist      → create AGENTS.md (Scenario A)
   If AGENTS.md already exists       → create AGENTS_ANEX.md (Scenario B)
+
+MODULES (spec §3)
+  1-5  Technology Stack / Conventions / Rules / Workflow / Documentation
+  6    Context Spec (description, exact stack, domain restrictions, language)
+  7    Guardrails Spec (token budgets, DLP mode, anti-injection, max iterations)
+  8    Output Format Spec (schema, verbosity, LaTeX/code handling)
+
+DEFAULTS (spec §6.2 — standard production defaults)
+  Token budget call = 32000, session = 128000, max iterations = 10,
+  DLP mode = redact, anti-injection = true, language = English,
+  output schema = structured markdown, verbosity = minimal, LaTeX = allow
 `);
 }
 
@@ -266,6 +287,32 @@ const DEFAULTS = {
 - **Separate Review Process**: No
 - **Approval Required**: Yes (maintainer)
 - **SLA for Review**: Same as code review`,
+
+  // ── Spec defaults (Block A/B/C — standard production defaults, spec §6.2) ──
+  // Structured objects (not markdown bodies): validated strictly, rendered to
+  // high-density markdown tables at template time, emitted in the JSON audit.
+  spec: {
+    context: {
+      technicalDescription:
+        'Token-optimized multi-agent framework. Orchestrator interprets high-level requests, crafts specialized sub-prompts, coordinates expert agents via parallel/sequential execution.',
+      exactTechStack: 'Derived from Technology Stack section',
+      domainRestrictions: 'None specified',
+      defaultLanguage: 'English',
+    },
+    guardrails: {
+      // Mirrors GuardrailManager.DEFAULT_POLICY (packages/core/lib/guardrails/guardrail-manager.mjs)
+      tokenBudgetPerCall: 32000, // per agent call, int 1000–64000
+      tokenBudgetPerSession: 128000, // per pipeline session, int >= perCall
+      dlpMode: 'redact', // enum: scan | redact
+      antiInjection: true, // boolean: sanitize free-text against prompt injection
+      maxIterations: 10, // int 1–20
+    },
+    output: {
+      outputSchema: 'structured markdown', // enum: structured markdown | json
+      verbosity: 'minimal', // enum: minimal | standard | detailed
+      latexHandling: 'allow', // enum: allow | escape
+    },
+  },
 };
 
 // ── Structured choice helper ──
@@ -636,12 +683,156 @@ async function moduleDocs(yes) {
 - **Approval Required**: Yes (maintainer)`;
 }
 
+// ── Strict integer prompt (spec §6.2) ──
+// ADR-004: strict /^\d+$/ parse + range. On invalid input warn, retry at most
+// once, then fall back to the DEFAULTS value (never hang piped CI input).
+// Returns the accepted value and appends a fallback note to changes.
+// brief() is module-scope (also used by validateConfig diagnostics): 4 chars
+// so even a short pasted secret is not echoed verbatim into logs/audit.
+const brief = (s) => (s ? String(s).slice(0, 4) + '…' : '(empty)');
+
+async function askInt(prompt, def, min, max, changes) {
+  let raw = await ask(`${prompt} (${min}-${max})`, String(def));
+  const parse = (s) => (/^\d+$/.test(s) ? Number(s) : NaN);
+  if (!Number.isNaN(parse(raw)) && parse(raw) >= min && parse(raw) <= max) return parse(raw);
+  console.log(`  ⚠ Invalid integer "${brief(raw)}" — expected ${min}-${max}. Retrying once...`);
+  raw = await ask(`${prompt} (${min}-${max})`, String(def));
+  if (!Number.isNaN(parse(raw)) && parse(raw) >= min && parse(raw) <= max) return parse(raw);
+  changes.push(`${prompt} fell back to default ${def} (invalid input "${brief(raw)}")`);
+  return def;
+}
+
+// ── Spec modules (Blocks A/B/C) ──
+// Each returns a structured object (data.spec.*). Validation of types, ranges
+// and enums is performed again in validateConfig as the final gate.
+
+// Block A — Context Spec (spec §3.2)
+async function moduleContext(yes, stackBody) {
+  const def = DEFAULTS.spec.context;
+
+  // Derive exact tech stack from Module 1 answers — avoids double-asking and
+  // guarantees coherence between the two sections. Runs in --yes mode too.
+  const extract = (section, pattern) => {
+    const m = (section || '').match(new RegExp(pattern));
+    return m ? m[1].trim() : '-';
+  };
+  const exactTechStack =
+    [
+      extract(stackBody, /Languages\*\*:\s*([^\n]*)/),
+      extract(stackBody, /Web Framework\*\*:\s*([^\n]*)/),
+      extract(stackBody, /Database\(s\)\*\*:\s*([^\n]*)/),
+    ]
+      .filter((v) => v && v !== '-')
+      .join(' / ') || def.exactTechStack;
+
+  if (yes) return { ...def, exactTechStack };
+  console.log('\n=== Module 6: Context Spec ===');
+
+  const technicalDescription =
+    (await ask('Technical description (one line)', def.technicalDescription)).trim() || def.technicalDescription;
+
+  const domainRestrictions =
+    (await ask('Domain restrictions (comma separated, blank = none)', def.domainRestrictions)).trim() ||
+    def.domainRestrictions;
+
+  const defaultLanguage = await askChoice(
+    'Default language for agent output',
+    ['English', 'Spanish', 'French', 'German', 'Japanese', 'Other'],
+    1,
+  );
+
+  return { technicalDescription, exactTechStack, domainRestrictions, defaultLanguage };
+}
+
+// Block B — Guardrails Spec (spec §3.3)
+async function moduleGuardrails(yes) {
+  const def = DEFAULTS.spec.guardrails;
+  if (yes) return { ...def };
+  console.log('\n=== Module 7: Guardrails Spec ===');
+  const changes = [];
+
+  const tokenBudgetPerCall = await askInt('Token budget per agent call', def.tokenBudgetPerCall, 1000, 64000, changes);
+  const tokenBudgetPerSession = await askInt(
+    'Token budget per pipeline session',
+    def.tokenBudgetPerSession,
+    tokenBudgetPerCall,
+    512000,
+    changes,
+  );
+  const dlpMode = await askChoice('DLP mode for secrets', ['redact', 'scan'], 1);
+  const antiInjection = (await askChoice('Anti-injection sanitization', ['true', 'false'], 1)) === 'true';
+  const maxIterations = await askInt('Max iterations per pipeline', def.maxIterations, 1, 20, changes);
+
+  for (const c of changes) console.log(`  • ${c}`);
+  return { tokenBudgetPerCall, tokenBudgetPerSession, dlpMode, antiInjection, maxIterations };
+}
+
+// Block C — Output Format Spec (spec §3.4)
+async function moduleOutputFormat(yes) {
+  const def = DEFAULTS.spec.output;
+  if (yes) return { ...def };
+  console.log('\n=== Module 8: Output Format Spec ===');
+  const outputSchema = await askChoice('Output schema for system responses', ['structured markdown', 'json'], 1);
+  const verbosity = await askChoice('Verbosity level', ['minimal', 'standard', 'detailed'], 1);
+  const latexHandling = await askChoice('LaTeX / math notation handling', ['allow', 'escape'], 1);
+  return { outputSchema, verbosity, latexHandling };
+}
+
+// ── Spec render helpers (deterministic, high-density markdown) ──
+// No user text is echoed unsanitized: securityPass has already scrubbed the
+// values before rendering.
+function mdCell(v) {
+  const s = String(v ?? '-')
+    .replace(/\r/g, ' ') // CR is a CommonMark line terminator — would break table rows
+    .replace(/\n/g, ' ')
+    .replace(/[|]/g, '\\|')
+    .replace(/[<]/g, '&lt;')
+    .replace(/[>]/g, '&gt;')
+    .replace(/`/g, '\\`');
+  return s || '-';
+}
+
+export function renderContextSpec(ctx = {}) {
+  const d = DEFAULTS.spec.context;
+  const c = { ...d, ...ctx };
+  return `| Field | Value |
+|---|---|
+| Technical Description | ${mdCell(c.technicalDescription)} |
+| Exact Tech Stack | ${mdCell(c.exactTechStack)} |
+| Domain Restrictions | ${mdCell(c.domainRestrictions)} |
+| Default Language | ${mdCell(c.defaultLanguage)} |`;
+}
+
+export function renderGuardrailsSpec(g = {}) {
+  const d = DEFAULTS.spec.guardrails;
+  const gr = { ...d, ...g };
+  return `| Guardrail | Value |
+|---|---|
+| Token Budget (per call) | ${gr.tokenBudgetPerCall} |
+| Token Budget (per session) | ${gr.tokenBudgetPerSession} |
+| DLP Mode (secrets) | ${gr.dlpMode} |
+| Anti-Injection Sanitize | ${gr.antiInjection ? 'true' : 'false'} |
+| Max Iterations | ${gr.maxIterations} |
+| Secrets | Environment variable placeholders only — never stored in this file (\$VAR_NAME) |`;
+}
+
+export function renderOutputFormatSpec(o = {}) {
+  const d = DEFAULTS.spec.output;
+  const op = { ...d, ...o };
+  return `| Output Control | Value |
+|---|---|
+| Output Schema | ${mdCell(op.outputSchema)} |
+| Verbosity | ${mdCell(op.verbosity)} |
+| LaTeX / Code Handling | ${mdCell(op.latexHandling)} |`;
+}
+
 // ── Sanitization & Coherence Layer (spec §2, §3) ──
-// Gatekeeper that runs AFTER the 5-module questionnaire and BEFORE rendering.
-// Three stages (spec §3 pipeline):
+// Gatekeeper that runs AFTER the 8-module questionnaire and BEFORE rendering.
+// Four stages (spec §3 pipeline):
 //   1. Structural  — dedupe markdown headers, drop empty list items
 //   2. Technical   — Python standards, framework mutex resolution
-//   3. Syntax Guard— empty/placeholder cleanup, typo correction
+//   3. Security    — prompt-injection scrub + secret → $ENV placeholder (Block A/B)
+//   4. Syntax Guard— empty/placeholder cleanup, typo correction
 // Returns { data, changes } where changes is a human-readable changelog.
 
 // Keyword sets (spec §2.2)
@@ -653,6 +844,135 @@ function lowerList(s) {
     .split(/[,\n|]/)
     .map((x) => x.trim().toLowerCase())
     .filter(Boolean);
+}
+
+// ── Secret → env placeholder mapping (spec §4: never store secrets) ──
+// High/critical-confidence patterns only. DEFAULTS and template literals are
+// trusted and never scanned; only user-originated free text is processed.
+const SECRET_PLACEHOLDERS = {
+  'openai-api-key': 'OPENAI_API_KEY',
+  'anthropic-api-key': 'ANTHROPIC_API_KEY',
+  'github-token': 'GITHUB_TOKEN',
+  'github-oauth-token': 'GITHUB_TOKEN',
+  'github-user-token': 'GITHUB_TOKEN',
+  'slack-token': 'SLACK_TOKEN',
+  'aws-access-key': 'AWS_ACCESS_KEY_ID',
+  'private-key': 'PRIVATE_KEY',
+  'jwt-token': 'JWT_SECRET',
+  'database-connection-string': 'DATABASE_URL',
+  'message-broker-connection': 'BROKER_URL',
+  certificate: 'CERTIFICATE',
+  'credential-assignment': 'SECRET',
+  'high-entropy-token': 'TOKEN',
+};
+
+export function secretPlaceholder(type) {
+  return `$${SECRET_PLACEHOLDERS[type] || 'SECRET'}`;
+}
+
+// Stage 3: security — prompt-injection scrub + secret redaction.
+// Runs on ALL user-originated free text (project name, spec fields, legacy
+// markdown bodies that may carry custom "Other" answers). Injection hits become
+// "[blocked: <category>]" (whole line for short lines, phrase otherwise);
+// secrets become "$ENV_PLACEHOLDER". Never echoes the raw value.
+// Complexity is $O(n·p)$ (n = text length, p = pattern count); inputs longer
+// than 1 MB are skipped with a note (ReDoS guard).
+const MAX_SCAN_LENGTH = 1_000_000;
+const MAX_LINE_BLOCK = 200; // whole-line blocking below this line length
+
+function classifyInjectionTag(tag) {
+  const t = tag.toLowerCase();
+  if (t.includes('system prompt')) return 'system-override';
+  if (t.includes('you are') || t.includes('act as') || t.includes('pretend') || t.includes('from now on'))
+    return 'role-play';
+  if (t.includes('run the following') || t.includes('execute the following')) return 'exec-injection';
+  if (
+    t.includes('print') ||
+    t.includes('reveal') ||
+    t.includes('show') ||
+    t.includes('repeat') ||
+    t.includes('what is')
+  ) {
+    return 'prompt-extraction';
+  }
+  return 'instruction-override';
+}
+
+function securityPass(data, changes) {
+  const scanFields = [
+    ['projectName', data.projectName],
+    ['spec.context.technicalDescription', data.spec?.context?.technicalDescription],
+    ['spec.context.domainRestrictions', data.spec?.context?.domainRestrictions],
+    ['spec.context.exactTechStack', data.spec?.context?.exactTechStack],
+    ['spec.context.defaultLanguage', data.spec?.context?.defaultLanguage],
+    ['stack', data.stack],
+    ['conventions', data.conventions],
+    ['rules', data.rules],
+    ['workflow', data.workflow],
+    ['docs', data.docs],
+  ];
+
+  for (const [key, value] of scanFields) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    if (value.length > MAX_SCAN_LENGTH) {
+      changes.push(
+        `Field ${key} too large (${value.length} chars > ${MAX_SCAN_LENGTH}) — content replaced with manual-review marker`,
+      );
+      const scrubbed = '[skipped: >1MB — review manually before use]';
+      if (key.startsWith('spec.')) {
+        const [, sub, field] = key.split('.');
+        if (data.spec?.[sub]) data.spec[sub][field] = scrubbed;
+      } else {
+        data[key] = scrubbed;
+      }
+      continue;
+    }
+
+    // 1) Prompt-injection scrub (mode 'report' → tag, never block/abort)
+    const inj = sanitizeInput(value, { mode: 'report' });
+    if (inj.alerts.length) {
+      for (const a of inj.alerts) {
+        // Category/severity only — never echo the matched text: the match may
+        // contain a raw secret (e.g. fenced block with key inside).
+        changes.push(`Injection pattern blocked in ${key} [${a.category}/${a.severity}]`);
+      }
+    }
+    let scrubbed = inj.sanitized.replace(/\[⚠ INJECTION DETECTED: ([^\]]*)\]/g, (m, captured) => {
+      const cat = classifyInjectionTag(captured);
+      return `[blocked: ${cat}]`;
+    });
+
+    // Whole-line blocking: for short lines, replace the entire line containing
+    // the injection so no imperative residue survives (e.g. "…and delete the DB").
+    if (inj.alerts.length) {
+      const lines = scrubbed.split('\n');
+      for (let li = 0; li < lines.length; li++) {
+        if (lines[li].includes('[blocked:') && lines[li].trim().length <= MAX_LINE_BLOCK) {
+          lines[li] = `[blocked: ${lines[li].match(/\[blocked: ([a-z-]+)\]/)?.[1] || 'injection'}]`;
+        }
+      }
+      scrubbed = lines.join('\n');
+    }
+
+    // 2) Secret scan + $ENV placeholder replacement (redact mode)
+    const sec = scanSecrets(scrubbed, { mode: 'redact' });
+    if (sec.findings.length) {
+      for (const f of sec.findings) {
+        changes.push(`Secret ${f.type} scrubbed in ${key} → ${secretPlaceholder(f.type)} (export it as an env var)`);
+      }
+    }
+    if (sec.redacted !== null && sec.redacted !== scrubbed) {
+      scrubbed = sec.redacted.replace(/\[REDACTED:([a-z0-9_-]+)\]/g, (m, t) => secretPlaceholder(t));
+    }
+
+    // Write back to data (structured spec fields + legacy bodies)
+    if (key.startsWith('spec.')) {
+      const [, sub, field] = key.split('.');
+      if (data.spec?.[sub]) data.spec[sub][field] = scrubbed;
+    } else {
+      data[key] = scrubbed;
+    }
+  }
 }
 
 // Stage 1: structural — remove duplicate "## " headers within a single section block
@@ -697,11 +1017,16 @@ function technicalPass(data, changes) {
     if (indentMatch) {
       const cur = indentMatch[1].trim();
       if (!/4\s*spaces/.test(cur)) {
+        // Scrub the quoted value before it reaches the generated doc / audit
+        // log (technicalPass runs BEFORE securityPass, so secrets may be raw).
+        const safeCur = (scanSecrets(cur, { mode: 'redact' }).redacted ?? cur)
+          .replace(/\[REDACTED:([a-z0-9_-]+)\]/g, (m, t) => secretPlaceholder(t))
+          .slice(0, 40);
         data.conventions = data.conventions.replace(
           /\*\*Indentation\*\*:[^\n]*/,
-          '**Indentation**: 4 spaces - PEP 8 (overridden from "' + cur + '")',
+          '**Indentation**: 4 spaces - PEP 8 (overridden from "' + safeCur + '")',
         );
-        changes.push(`Indentation set to "4 spaces" (PEP 8) — Python detected, was "${cur}"`);
+        changes.push(`Indentation set to "4 spaces" (PEP 8) — Python detected, was "${safeCur}"`);
       }
     }
     // §2.1 Formatter coherence
@@ -829,8 +1154,34 @@ export function sanitize(data) {
   }
   // Stage 2 — technical
   const isPython = technicalPass(data, changes);
-  // Stage 3 — syntax guard
+  // Stage 3 — security (injection + secrets) — runs before syntax guard so
+  // scrubbed markers are preserved, and after technical so framework mutex
+  // messages (which quote user text) are themselves sanitized downstream.
+  securityPass(data, changes);
+  // Stage 4 — syntax guard
   syntaxPass(data, changes);
+  // Re-run only the redaction pass after syntax rewrites, so any secret that
+  // reached the final text is never emitted raw.
+  for (const [key, value] of [
+    ['projectName', data.projectName],
+    ['stack', data.stack],
+    ['conventions', data.conventions],
+    ['rules', data.rules],
+    ['workflow', data.workflow],
+    ['docs', data.docs],
+  ]) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    if (value.length > MAX_SCAN_LENGTH) continue; // securityPass already handled the cap note
+    const sec = scanSecrets(value, { mode: 'redact' });
+    if (sec.findings.length) {
+      for (const f of sec.findings) {
+        changes.push(`Secret ${f.type} scrubbed post-syntax in ${key} → ${secretPlaceholder(f.type)}`);
+      }
+      const scrubbed = sec.redacted.replace(/\[REDACTED:([a-z0-9_-]+)\]/g, (m, t) => secretPlaceholder(t));
+      if (key === 'projectName') data.projectName = scrubbed;
+      else data[key] = scrubbed;
+    }
+  }
   return { data, changes, isPython };
 }
 
@@ -843,41 +1194,85 @@ export function stripLeadingHeader(section) {
 }
 
 function renderConfig(tpl, data) {
-  return tpl
-    .replace(/\{project_name\}/g, data.projectName)
-    .replace(/\{version\}/g, data.version)
-    .replace(/\{created\}/g, data.created)
-    .replace(/\{stack\}/g, stripLeadingHeader(data.stack))
-    .replace(/\{conventions\}/g, stripLeadingHeader(data.conventions))
-    .replace(/\{rules\}/g, stripLeadingHeader(data.rules))
-    .replace(/\{workflow\}/g, stripLeadingHeader(data.workflow))
-    .replace(/\{docs\}/g, stripLeadingHeader(data.docs));
+  return (
+    tpl
+      .replace(/\{project_name\}/g, data.projectName)
+      .replace(/\{version\}/g, data.version)
+      .replace(/\{created\}/g, data.created)
+      .replace(/\{stack\}/g, stripLeadingHeader(data.stack))
+      .replace(/\{conventions\}/g, stripLeadingHeader(data.conventions))
+      .replace(/\{rules\}/g, stripLeadingHeader(data.rules))
+      .replace(/\{workflow\}/g, stripLeadingHeader(data.workflow))
+      .replace(/\{docs\}/g, stripLeadingHeader(data.docs))
+      // Spec blocks (optional chaining → legacy data objects render unchanged)
+      .replace(/\{context\}/g, renderContextSpec(data.spec?.context))
+      .replace(/\{guardrails\}/g, renderGuardrailsSpec(data.spec?.guardrails))
+      .replace(/\{output_format\}/g, renderOutputFormatSpec(data.spec?.output))
+      // CR normalization (defense-in-depth — legacy bodies may embed CR).
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+  );
 }
 
 function renderAnex(tpl, data) {
-  return tpl
-    .replace(/\{project_name\}/g, data.projectName)
-    .replace(/\{version\}/g, data.version)
-    .replace(/\{created\}/g, data.created)
-    .replace(/\{base_version\}/g, data.baseVersion)
-    .replace(/\{ext_scope\}/g, data.extScope)
-    .replace(/\{stack\}/g, stripLeadingHeader(data.stack))
-    .replace(/\{conventions\}/g, stripLeadingHeader(data.conventions))
-    .replace(/\{rules\}/g, stripLeadingHeader(data.rules))
-    .replace(/\{workflow\}/g, stripLeadingHeader(data.workflow))
-    .replace(/\{docs\}/g, stripLeadingHeader(data.docs));
+  return (
+    tpl
+      .replace(/\{project_name\}/g, data.projectName)
+      .replace(/\{version\}/g, data.version)
+      .replace(/\{created\}/g, data.created)
+      .replace(/\{base_version\}/g, data.baseVersion)
+      .replace(/\{ext_scope\}/g, data.extScope)
+      .replace(/\{stack\}/g, stripLeadingHeader(data.stack))
+      .replace(/\{conventions\}/g, stripLeadingHeader(data.conventions))
+      .replace(/\{rules\}/g, stripLeadingHeader(data.rules))
+      .replace(/\{workflow\}/g, stripLeadingHeader(data.workflow))
+      .replace(/\{docs\}/g, stripLeadingHeader(data.docs))
+      .replace(/\{context\}/g, renderContextSpec(data.spec?.context))
+      .replace(/\{guardrails\}/g, renderGuardrailsSpec(data.spec?.guardrails))
+      .replace(/\{output_format\}/g, renderOutputFormatSpec(data.spec?.output))
+      // CR normalization (defense-in-depth — legacy bodies may embed CR).
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+  );
 }
 
 // ── Validation (spec §6.2 + §5 checklist) ─
-function validateConfig(content, which, data = {}) {
+
+/**
+ * Post-render DLP gate. Scans rendered content for raw secrets and returns
+ * formatted blocker errors (critical/high) and warning labels (medium/PII).
+ * Never echoes the matched value — only type + hit count.
+ * @param {string} content
+ * @returns {{ blockers: string[], warnings: string[] }}
+ */
+export function runDlpGate(content) {
+  const finalScan = scanSecrets(content, { mode: 'scan' });
+  const blockers = [];
+  const warnings = [];
+  const hitsByType = (type) => finalScan.findings.filter((f) => f.type === type).length;
+  for (const type of [
+    ...new Set(finalScan.findings.filter((f) => f.severity === 'critical' || f.severity === 'high').map((f) => f.type)),
+  ]) {
+    blockers.push(`DLP: raw ${type} found in rendered content — refusing to write (${hitsByType(type)} hit(s))`);
+  }
+  for (const type of [...new Set(finalScan.findings.filter((f) => f.severity === 'medium').map((f) => f.type))]) {
+    warnings.push(type);
+  }
+  return { blockers, warnings };
+}
+
+export function validateConfig(content, which, data = {}) {
   const errors = [];
   if (which === 'config') {
     const required = [
       '## Technology Stack',
+      '## Context Spec',
       '## Code Conventions & Standards',
       '## Operational Rules & Constraints',
+      '## Guardrails Spec',
       '## Workflow & Process Definition',
       '## Documentation Requirements',
+      '## Output Format Spec',
       '## Agent Responsibilities',
     ];
     for (const r of required) if (!content.includes(r)) errors.push(`Missing section: ${r}`);
@@ -913,6 +1308,66 @@ function validateConfig(content, which, data = {}) {
     if (!/\*\*Extends\*\*:\s*AGENTS\.md \(v/.test(content)) errors.push('Missing reference to base AGENTS.md version');
     if (!/Load Order for Agents/.test(content)) errors.push('Missing load order instructions');
     if (!/Conflict Resolution/.test(content)) errors.push('Missing conflict resolution guidelines');
+    // Mandatory precedence clause (spec §5.1)
+    if (!content.includes('Conflicts resolve in favor of AGENTS_ANEX.md')) {
+      errors.push(
+        'Missing precedence clause: "This annex extends AGENTS.md. Conflicts resolve in favor of AGENTS_ANEX.md"',
+      );
+    }
+    const requiredAnex = [
+      '## Supplementary Context Spec',
+      '## Supplementary Guardrails Spec',
+      '## Supplementary Output Format Spec',
+    ];
+    for (const r of requiredAnex) if (!content.includes(r)) errors.push(`Missing annex section: ${r}`);
+  }
+
+  // §6.2 Spec validation — strict types, ranges and enums (Blocks A/B/C).
+  // Shared by both scenarios. Guarded with optional chaining so legacy data
+  // objects (without data.spec) are skipped.
+  const spec = data.spec;
+  if (spec) {
+    const g = spec.guardrails || {};
+    if (!Number.isInteger(g.tokenBudgetPerCall) || g.tokenBudgetPerCall < 1000 || g.tokenBudgetPerCall > 64000) {
+      errors.push(`Guardrails: tokenBudgetPerCall must be an integer 1000-64000, got "${g.tokenBudgetPerCall}"`);
+    }
+    if (
+      !Number.isInteger(g.tokenBudgetPerSession) ||
+      g.tokenBudgetPerSession < (g.tokenBudgetPerCall || 0) ||
+      g.tokenBudgetPerSession > 512000
+    ) {
+      errors.push(
+        `Guardrails: tokenBudgetPerSession must be an integer >= per-call budget (1000-512000), got "${g.tokenBudgetPerSession}"`,
+      );
+    }
+    if (!Number.isInteger(g.maxIterations) || g.maxIterations < 1 || g.maxIterations > 20) {
+      errors.push(`Guardrails: maxIterations must be an integer 1-20, got "${g.maxIterations}"`);
+    }
+    if (!['scan', 'redact'].includes(g.dlpMode))
+      errors.push(`Guardrails: dlpMode must be scan|redact, got "${brief(g.dlpMode)}"`);
+    if (typeof g.antiInjection !== 'boolean')
+      errors.push(`Guardrails: antiInjection must be boolean, got "${g.antiInjection}"`);
+
+    const o = spec.output || {};
+    if (!['structured markdown', 'json'].includes(o.outputSchema)) {
+      errors.push(`Output Format: outputSchema must be "structured markdown"|"json", got "${brief(o.outputSchema)}"`);
+    }
+    if (!['minimal', 'standard', 'detailed'].includes(o.verbosity)) {
+      errors.push(`Output Format: verbosity must be minimal|standard|detailed, got "${brief(o.verbosity)}"`);
+    }
+    if (!['allow', 'escape'].includes(o.latexHandling)) {
+      errors.push(`Output Format: latexHandling must be allow|escape, got "${brief(o.latexHandling)}"`);
+    }
+
+    const c = spec.context || {};
+    if (!c.defaultLanguage || typeof c.defaultLanguage !== 'string') {
+      errors.push('Context Spec: defaultLanguage must be a non-empty string');
+    }
+
+    // §5 Residue — no unsanitized injection/secret markers may reach disk
+    if (/\[⚠ INJECTION DETECTED/.test(content)) errors.push('Residue: unsanitized injection marker found in content');
+    if (/\[REDACTED:[a-z0-9_-]+\]/.test(content))
+      errors.push('Residue: unsanitized [REDACTED:...] marker found in content');
   }
   return errors;
 }
@@ -939,6 +1394,11 @@ export async function generateAgentsConfig({ outDir = cwd(), yes = false, rl = n
     rules: '',
     workflow: '',
     docs: '',
+    spec: {
+      context: { ...DEFAULTS.spec.context },
+      guardrails: { ...DEFAULTS.spec.guardrails },
+      output: { ...DEFAULTS.spec.output },
+    },
   };
 
   // Gather project name once
@@ -963,14 +1423,18 @@ export async function generateAgentsConfig({ outDir = cwd(), yes = false, rl = n
     data.projectName = DEFAULTS.projectName;
   }
 
-  // §3 — five modules (parallel-free; sequential by design in spec)
+  // §3 — eight modules (parallel-free; sequential by design in spec)
   data.stack = await moduleStack(yes);
   data.conventions = await moduleConventions(yes);
   data.rules = await moduleRules(yes);
   data.workflow = await moduleWorkflow(yes);
   data.docs = await moduleDocs(yes);
 
-  // ── Sanitization & Coherence Layer (spec §2, §3) ──
+  // ── Spec blocks (A/B/C) — captured before sanitization ──
+  data.spec.context = await moduleContext(yes, data.stack);
+  data.spec.guardrails = await moduleGuardrails(yes);
+  data.spec.output = await moduleOutputFormat(yes);
+
   const { changes } = sanitize(data);
   if (changes.length) {
     console.log('\n→ Sanitization applied (coherence layer):');
@@ -1019,6 +1483,16 @@ export async function generateAgentsConfig({ outDir = cwd(), yes = false, rl = n
 
   // §6.2 validation + §5 checklist
   const errors = validateConfig(content, which, data);
+
+  // Post-render DLP gate: scan the FINAL rendered content for raw secrets
+  // (belt-and-suspenders — securityPass + post-syntax re-scan already ran).
+  // Abort on critical/high findings (type + count only — never echo the
+  // value); medium-severity findings (PII) are warnings since they are
+  // expected in legitimate documentation (emails, phones).
+  const { blockers, warnings } = runDlpGate(content);
+  errors.push(...blockers);
+  for (const w of warnings) console.warn(`  ⚠ DLP: ${w} detected in content (medium severity — informational)`);
+
   if (errors.length) {
     console.error('\n✖ Validation failed:');
     for (const e of errors) console.error('  - ' + e);
@@ -1031,13 +1505,43 @@ export async function generateAgentsConfig({ outDir = cwd(), yes = false, rl = n
   const rel = outFile === CWD ? '.' : relative(CWD, outFile);
   const portable = rel && !rel.startsWith('..') ? rel.replace(/^\//, '') : basename(outFile);
   console.log(`\n✓ ${which === 'config' ? 'AGENTS.md' : 'AGENTS_ANEX.md'} generated at ${portable}`);
+  printAudit({ data, which, outFile: portable, changes, errors });
   return outFile;
+}
+
+// ── Confirmation & audit (spec §5.4) ──
+// Emits a single-line machine-readable summary prefixed with AUDIT_JSON= so
+// downstream tooling can extract it. All free-text values are already scrubbed
+// by securityPass; secrets never appear (placeholder names only).
+export function printAudit({ data, which, outFile, changes = [], errors = [] }) {
+  const spec = data.spec || {};
+  const audit = {
+    scenario: which,
+    file: outFile,
+    project: data.projectName,
+    context: {
+      defaultLanguage: spec.context?.defaultLanguage ?? 'English',
+      exactTechStack: spec.context?.exactTechStack ?? '-',
+    },
+    guardrails: spec.guardrails ?? null,
+    output: spec.output ?? null,
+    sanitization: {
+      changes,
+      secretPlaceholders: (changes || []).filter((c) => c.includes('→ $')),
+    },
+    validation: {
+      ok: errors.length === 0,
+      errors,
+    },
+  };
+  console.log(`AUDIT_JSON=${JSON.stringify(audit)}`);
 }
 
 // ── CLI entry ──
 async function main() {
   const o = parseArgs();
-  bindReadline(null); // standalone → create own readline
+  // Standalone readline is created inside generateAgentsConfig (line ~1321)
+  // when no rl/askFn is injected; no need to bind here.
   try {
     await generateAgentsConfig({ outDir: o.out, yes: o.yes });
     closeReadlineIfOwn();

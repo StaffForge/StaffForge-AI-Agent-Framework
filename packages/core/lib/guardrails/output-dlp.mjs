@@ -25,23 +25,27 @@ const SECRET_PATTERNS = [
   { pattern: /ghu_[a-zA-Z0-9]{36}/g, type: 'github-user-token', severity: 'critical', entropy: true },
   { pattern: /xox[abpors]-[a-zA-Z0-9]{10,}/g, type: 'slack-token', severity: 'critical', entropy: true },
   { pattern: /AKIA[0-9A-Z]{16}/g, type: 'aws-access-key', severity: 'critical', entropy: true },
+  // JWT tokens — segments bounded to keep matching linear (unbounded `+`
+  // before the literal dots is quadratic on long eyJ-prefixed runs).
   {
-    pattern: /eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g,
+    pattern: /eyJ[a-zA-Z0-9_-]{0,200}\.[a-zA-Z0-9_-]{0,1024}\.[a-zA-Z0-9_-]{0,2048}/g,
     type: 'jwt-token',
     severity: 'high',
     entropy: true,
   },
 
   // Private Keys — high confidence
+  // The middle is bounded to 8 KiB (private keys are ~1.7-4 KiB in practice) —
+  // an unbounded [\s\S]*? is quadratic on huge inputs.
   {
     pattern:
-      /-----BEGIN\s+(RSA|DSA|EC|OPENSSH|PGP)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+(RSA|DSA|EC|OPENSSH|PGP)\s+PRIVATE\s+KEY-----/g,
+      /-----BEGIN\s+(RSA|DSA|EC|OPENSSH|PGP)\s+PRIVATE\s+KEY-----[\s\S]{0,8192}?-----END\s+(RSA|DSA|EC|OPENSSH|PGP)\s+PRIVATE\s+KEY-----/g,
     type: 'private-key',
     severity: 'critical',
     entropy: false,
   },
   {
-    pattern: /-----BEGIN\s+CERTIFICATE-----[\s\S]*?-----END\s+CERTIFICATE-----/g,
+    pattern: /-----BEGIN\s+CERTIFICATE-----[\s\S]{0,16384}?-----END\s+CERTIFICATE-----/g,
     type: 'certificate',
     severity: 'high',
     entropy: false,
@@ -72,8 +76,14 @@ const SECRET_PATTERNS = [
     entropy: false,
   },
 
-  // PII — medium confidence
-  { pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, type: 'email-address', severity: 'medium', entropy: false },
+  // PII — medium confidence. Quantifiers bounded: unbounded `+` before the
+  // literal `@` is quadratic on long digit/dash/dot runs with no `@` present.
+  {
+    pattern: /\b[A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,255}\.[A-Z]{2,24}\b/gi,
+    type: 'email-address',
+    severity: 'medium',
+    entropy: false,
+  },
   { pattern: /\b(?:\d{3}[-.]?){2}\d{4}\b/g, type: 'phone-number', severity: 'medium', entropy: false },
 ];
 
