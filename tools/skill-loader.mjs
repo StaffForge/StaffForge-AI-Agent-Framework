@@ -19,7 +19,9 @@ function toTitle(name) {
 }
 
 function parseSkill(file, content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  // \r?\n: tolerate CRLF line endings (same silent-failure class as the
+  // agent-registry CRLF bug — a CRLF skill file would be dropped otherwise).
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) {
     throw new Error(`${file}: no valid frontmatter`);
   }

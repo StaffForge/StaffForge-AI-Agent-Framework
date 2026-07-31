@@ -31,8 +31,8 @@ export async function validateAgent(agentName, agentPath) {
     // 1. Does the file exist?
     const content = await readFile(agentPath, 'utf-8');
 
-    // 2. Parse YAML frontmatter
-    const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    // 2. Parse YAML frontmatter (\r?\n: tolerate CRLF line endings)
+    const yamlMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
     if (!yamlMatch) {
       throw new AgentValidationError(agentName, 'Missing YAML frontmatter', ['---...---']);
     }

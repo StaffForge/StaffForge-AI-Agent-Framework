@@ -71,7 +71,8 @@ if (skillFiles.length > 0) {
 
   for (const file of skillFiles) {
     const content = readFileSync(join(skillsDir, file), 'utf-8');
-    const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    // \r?\n: tolerate CRLF line endings (same class as the agent-registry CRLF bug)
+    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
 
     if (!match) {
       console.error(`FAIL  skill: ${file}: no valid frontmatter (must have YAML frontmatter between --- markers)`);
