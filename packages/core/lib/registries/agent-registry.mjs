@@ -14,7 +14,9 @@ function toTitle(id) {
 }
 
 function parseAgent(file, content) {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  // \r?\n: tolerate CRLF line endings (agents/orchestrator.md was CRLF-only,
+  // which silently dropped the orchestrator from the registry).
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) {
     throw new Error(`${file}: no valid frontmatter`);
   }

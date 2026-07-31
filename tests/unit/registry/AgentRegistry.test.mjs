@@ -413,5 +413,24 @@ extends: nonexistent
   fs.rmSync(dir, { recursive: true });
 }
 
+// CRLF regression — frontmatter regex must tolerate \r\n line endings.
+// Guards against the bug where a CRLF agent file (e.g. orchestrator.md) was
+// silently dropped from the registry (no valid frontmatter).
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-registry-test-'));
+  fs.writeFileSync(
+    path.join(dir, 'crlf-agent.md'),
+    '---\r\nid: crlf-agent\r\nname: CRLF Agent\r\nmode: subagent\r\ncategory: technology\r\ndescription: CRLF agent.\r\ntools:\r\n  write: false\r\n  bash: false\r\n  edit: false\r\n---\r\n# CRLF Body\r\n',
+    'utf-8',
+  );
+  const reg = new AgentRegistry(dir);
+  reg.load();
+  const agent = reg.findById('crlf-agent');
+  assert(agent !== null, 'CRLF frontmatter loads (not silently dropped)');
+  assert(agent.name === 'CRLF Agent', 'CRLF frontmatter parses name');
+  assert(agent.body === '# CRLF Body', 'CRLF body parsed');
+  fs.rmSync(dir, { recursive: true });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

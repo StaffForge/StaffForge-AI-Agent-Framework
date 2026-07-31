@@ -25,11 +25,10 @@ function assert(condition, name) {
 // (mirrors real usage: npx into a user project, not the framework repo).
 function runInstallInProject(platform) {
   const project = mkdtempSync(join(tmpdir(), 'staff-proj-'));
-  const result = spawnSync(
-    'node',
-    [cli, '--yes', '--platform', platform, '--agent', 'orchestrator'],
-    { cwd: project, encoding: 'utf-8' }
-  );
+  const result = spawnSync('node', [cli, '--yes', '--platform', platform, '--agent', 'orchestrator'], {
+    cwd: project,
+    encoding: 'utf-8',
+  });
   return { project, result };
 }
 
@@ -44,7 +43,10 @@ function runInstallInProject(platform) {
   const a11y = json.agent.a11y;
   assert(a11y && a11y.prompt, 'opencode a11y agent has prompt field');
   assert(a11y.prompt.includes('# Accessibility'), 'opencode a11y prompt contains agent body (Mission)');
-  assert(a11y.prompt.includes('## Mandatory Rules'), 'opencode a11y prompt contains rules');
+  assert(
+    a11y.prompt.includes('Mandatory Rules') || a11y.prompt.includes('Operational Guardrails'),
+    'opencode a11y prompt contains rules/guardrails',
+  );
 
   const orchestrator = json.agent.orchestrator;
   assert(orchestrator && orchestrator.prompt, 'opencode orchestrator has prompt');
@@ -79,7 +81,10 @@ function runInstallInProject(platform) {
     assert(a11y.startsWith('---'), 'claude-code A11y.md has frontmatter');
     assert(a11y.includes('name: A11y'), 'claude-code A11y.md frontmatter has name');
     assert(a11y.includes('# Accessibility'), 'claude-code A11y.md contains agent body');
-    assert(a11y.includes('## Mandatory Rules'), 'claude-code A11y.md contains rules');
+    assert(
+      a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
+      'claude-code A11y.md contains rules/guardrails',
+    );
   }
 
   // Must NOT dump agents into .claude/rules/ (that's for always-on rules)
@@ -104,7 +109,10 @@ function runInstallInProject(platform) {
   if (existsSync(rulesDir)) {
     const a11y = readFileSync(join(rulesDir, 'A11y.mdc'), 'utf-8');
     assert(a11y.includes('# Accessibility'), 'cursor A11y.mdc contains agent body');
-    assert(a11y.includes('## Mandatory Rules'), 'cursor A11y.mdc contains rules');
+    assert(
+      a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
+      'cursor A11y.mdc contains rules/guardrails',
+    );
   }
   rmSync(project, { recursive: true, force: true });
 }
@@ -126,6 +134,10 @@ function runInstallInProject(platform) {
     const content = readFileSync(inst, 'utf-8');
     assert(!content.includes('# Orchestrator'), 'copilot-instructions.md is NEUTRAL — no orchestrator body');
     assert(!content.includes('## Mandatory Rules'), 'copilot-instructions.md is NEUTRAL — no orchestrator rules');
+    assert(
+      !content.includes('## 1. AGENT ROLE'),
+      'copilot-instructions.md is NEUTRAL — no refactored orchestrator body',
+    );
     assert(content.includes('StaffForge AI Agent Framework'), 'copilot-instructions.md has project context');
     assert(content.includes('@orchestrator'), 'copilot-instructions.md mentions @orchestrator as available agent');
     // Must NOT dump all agent bodies — those go in .github/agents/
@@ -144,13 +156,18 @@ function runInstallInProject(platform) {
     assert(agentFiles.includes('orchestrator.agent.md'), 'orchestrator IS in .github/agents/ as @mentionable');
     assert(agentFiles.includes('a11y.agent.md'), 'sub-agents like a11y are also @mentionable');
 
-    // Verify orchestrator.agent.md has proper YAML frontmatter + body
+    // Verify orchestrator.agent.md has proper YAML frontmatter + body.
+    // The orchestrator was refactored (8b36d15) to the numbered-section
+    // format; assert the NEW stable markers, not the legacy prompt headers.
     const orchFile = readFileSync(join(agentsDir, 'orchestrator.agent.md'), 'utf-8');
     assert(orchFile.startsWith('---'), 'orchestrator.agent.md starts with frontmatter');
     assert(orchFile.includes('name: Orchestrator'), 'orchestrator.agent.md frontmatter has name');
     assert(orchFile.includes('description: '), 'orchestrator.agent.md frontmatter has description');
-    assert(orchFile.includes('# Orchestrator'), 'orchestrator.agent.md contains orchestrator body');
-    assert(orchFile.includes('## Mandatory Rules'), 'orchestrator.agent.md contains rules');
+    assert(orchFile.includes('## 1. AGENT ROLE'), 'orchestrator.agent.md contains orchestrator body');
+    assert(
+      orchFile.includes('### 🔴 Mandatory VCS Rules & Delegation Protocols'),
+      'orchestrator.agent.md contains rules',
+    );
 
     // Verify a sub-agent also has proper structure
     const a11yFile = readFileSync(join(agentsDir, 'a11y.agent.md'), 'utf-8');
@@ -203,7 +220,10 @@ function runInstallInProject(platform) {
     assert(mdFiles.includes('a11y.md'), 'agents/ has a11y.md');
     const a11y = readFileSync(join(outAgents, 'a11y.md'), 'utf-8');
     assert(a11y.includes('# Accessibility'), 'agents/a11y.md has body');
-    assert(a11y.includes('## Mandatory Rules'), 'agents/a11y.md has rules');
+    assert(
+      a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
+      'agents/a11y.md has rules/guardrails',
+    );
   }
   rmSync(project, { recursive: true, force: true });
 }

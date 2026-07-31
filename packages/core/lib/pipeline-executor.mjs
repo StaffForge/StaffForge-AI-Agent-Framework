@@ -6,15 +6,18 @@ import { getLearningEngine } from './engines/learning-engine.mjs';
 import { TelemetryCollector } from './telemetry/collector.mjs';
 import eventBus from './event-bus.mjs';
 import { GuardrailManager, getGuardrailManager } from './guardrails/guardrail-manager.mjs';
+import { handlePipelineError, PipelineError, ERROR_LEVELS } from './error-handler.mjs';
+import { validateAgent, AgentValidationError } from './agent-validator.mjs';
 
 export class PipelineExecutor {
-  constructor(router = null, scheduler = null, guardrailManager = null) {
+  constructor(router = null, scheduler = null, guardrailManager = null, agentRegistry = null) {
     this._router = router || getRouter();
     this._scheduler = scheduler || getScheduler();
     this._guardrails = guardrailManager || getGuardrailManager();
+    this._agentRegistry = agentRegistry;
   }
 
-  execute(taskType, prompt = '', options = {}) {
+  async execute(taskType, prompt = '', options = {}) {
     // ── Reset guardrail state for this pipeline run ──────────────────
     this._guardrails.reset();
 
@@ -134,9 +137,11 @@ export class PipelineExecutor {
 
     // ── Level Execution with Runtime Guardrails ─────────────────────
     let totalIterations = 0;
+    const levelErrors = [];
 
     for (let i = 0; i < plan.levels.length; i++) {
       const level = plan.levels[i];
+      const pipelineState = { ...ctx, issues: [], currentLevel: level };
 
       // Runtime guardrail: check iteration budget before each level
       totalIterations++;
@@ -187,12 +192,36 @@ export class PipelineExecutor {
         eventBus.emit('subagent:spawn', { ...ctx, subagentType: agentId, level: i + 1 });
 
         // ── C. OUTPUT GUARDRAILS (post-flight per agent) ──────────
-        // In a real execution, this would wrap the agent's actual output.
-        // For the declarative pipeline plan, we record that guardrails
-        // are active and ready for the orchestrator to use.
+        try {
+          // Agent validation pre-delegation (MEJORA 2)
+          try {
+            await this.validateAgentBeforeDelegation(agentId);
+          } catch (validationError) {
+            const pipelineErr =
+              validationError instanceof AgentValidationError
+                ? new PipelineError(validationError.message, ERROR_LEVELS.WARNING, { agentId })
+                : new PipelineError(validationError.message, ERROR_LEVELS.CRITICAL, { agentId });
 
-        eventBus.emit('agent:complete', { ...ctx, agentId, level: i + 1, duration: 0 });
-        eventBus.emit('subagent:complete', { ...ctx, subagentType: agentId, level: i + 1, duration: 0 });
+            const severity = await handlePipelineError(pipelineErr, agentId, pipelineState);
+            if (severity.action === 'ABORT') {
+              throw pipelineErr;
+            }
+            levelErrors.push({ agent: agentId, error: pipelineErr, severity });
+          }
+
+          eventBus.emit('agent:complete', { ...ctx, agentId, level: i + 1, duration: 0 });
+          eventBus.emit('subagent:complete', { ...ctx, subagentType: agentId, level: i + 1, duration: 0 });
+        } catch (error) {
+          const pipelineErr =
+            error instanceof PipelineError
+              ? error
+              : new PipelineError(error.message, ERROR_LEVELS.CRITICAL, { agentId });
+          const severity = await handlePipelineError(pipelineErr, agentId, pipelineState);
+          levelErrors.push({ agent: agentId, error: pipelineErr, severity });
+          eventBus.emit('agent:error', { ...ctx, agentId, level: i + 1, error: error.message });
+          eventBus.emit('subagent:error', { ...ctx, subagentType: agentId, level: i + 1, error: error.message });
+          if (severity.action === 'ABORT') throw error;
+        }
       }
 
       eventBus.emit('level:complete', { ...ctx, level: i + 1, duration: 0 });
@@ -236,12 +265,48 @@ export class PipelineExecutor {
 
     return result;
   }
+
+  // ── MEJORA 2: Agent Validation + Schema ────────────────────────────
+
+  async validateAgentBeforeDelegation(agentName) {
+    if (!this._agentRegistry) {
+      // No registry configured, skip validation
+      return { valid: true, spec: { id: agentName } };
+    }
+
+    const agentPath = this._agentRegistry.getAgentPath ? this._agentRegistry.getAgentPath(agentName) : null;
+
+    if (!agentPath) {
+      throw new AgentValidationError(agentName, `Agent not found in registry: ${agentName}`);
+    }
+
+    const validation = await validateAgent(agentName, agentPath);
+
+    if (!validation.valid) {
+      throw new AgentValidationError(agentName, `Agent validation failed: missing capabilities`);
+    }
+
+    return validation.spec;
+  }
+
+  async delegate(agentName, prompt, context) {
+    // 1. Validate agent BEFORE delegating
+    const agentSpec = await this.validateAgentBeforeDelegation(agentName);
+
+    // 2. Process delegation
+    return {
+      agent: agentSpec,
+      prompt,
+      delegated: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
 
 let _defaultInstance = null;
-export function getPipelineExecutor(router = null, scheduler = null, guardrailManager = null) {
+export function getPipelineExecutor(router = null, scheduler = null, guardrailManager = null, agentRegistry = null) {
   if (!_defaultInstance) {
-    _defaultInstance = new PipelineExecutor(router, scheduler, guardrailManager);
+    _defaultInstance = new PipelineExecutor(router, scheduler, guardrailManager, agentRegistry);
   }
   return _defaultInstance;
 }

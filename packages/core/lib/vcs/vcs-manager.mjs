@@ -108,6 +108,43 @@ export class VCSManager {
     return wf.getMergeFlags(target);
   }
 
+  // ── Transactional VCS Methods (MEJORA 4) ──────────────────────────
+
+  async createTagWithCheckpoint(checkpointName) {
+    return await this.tag(checkpointName, `Pipeline checkpoint: ${new Date().toISOString()}`);
+  }
+
+  async createBranchWithTransaction(branchName, fromBranch = 'develop') {
+    try {
+      await this.branch(branchName, { from: fromBranch });
+      return { success: true, branch: branchName };
+    } catch (error) {
+      // Cleanup on failure (ignore cleanup errors)
+      try {
+        await this._exec('deleteBranch', branchName);
+      } catch {
+        /* ignore */
+      }
+      throw error;
+    }
+  }
+
+  async mergeBranchWithTransaction(sourceBranch, targetBranch, options = {}) {
+    const backupTagName = `vcs/pre-merge-${Date.now()}`;
+
+    // Backup before merge
+    await this.createTagWithCheckpoint(backupTagName);
+
+    try {
+      return await this.merge(sourceBranch, targetBranch, options);
+    } catch (error) {
+      // Restore on failure
+      console.log(`Merge failed, restoring from ${backupTagName}`);
+      await this.checkout(backupTagName);
+      throw error;
+    }
+  }
+
   async _exec(method, ...args) {
     const provider = this.getActiveProvider();
     if (!provider) throw new Error(`No active VCS provider (${this.getConfig().provider} not registered)`);

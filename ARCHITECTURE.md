@@ -1,6 +1,6 @@
 # StaffForge AI Agent Framework — Architecture
 
-> Current state: v2.6.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing.  
+> Current state: v2.7.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + Error Handling + Agent Validation + Token Budgeting + VCS Transactions + Prompt Compression + Timeout Degradation.  
 > Active branch: `develop`
 
 ---
@@ -69,6 +69,12 @@ Shared programmatic APIs consumed by CLI tools and external consumers.
 | Pipeline Executor | `tools/lib/pipeline-executor.mjs` | `PipelineExecutor`, `getPipelineExecutor()` |
 | Task Mapper | `tools/lib/task-mapper.mjs` | `TaskMapper`, `getTaskMapper()` |
 | Logger | `tools/lib/logger.mjs` | `Logger`, `getLogger()` |
+| Error Handler | `packages/core/lib/error-handler.mjs` | `PipelineError`, `handlePipelineError`, `ERROR_LEVELS` |
+| Agent Validator | `packages/core/lib/agent-validator.mjs` | `validateAgent`, `validateAgentRegistry`, `AgentValidationError` |
+| Token Tracker | `packages/core/lib/token-tracker.mjs` | `TokenTracker` |
+| VCS Transaction | `packages/core/lib/vcs/vcs-transaction.mjs` | `VCSTransaction`, `VCS_TRANSACTION_TYPES` |
+| Prompt Optimizer | `packages/core/lib/prompt-optimizer.mjs` | `PromptOptimizer` |
+| Execution Config | `packages/core/lib/execution-config.mjs` | `ExecutionLimiter`, `DEGRADATION_STRATEGY`, `EXECUTION_TIMEOUTS` |
 
 **Capability Engine** (`CapabilityEngine`):
 - `analyzeIntent(text)` — extract keywords + detect task type
@@ -192,7 +198,10 @@ Shared programmatic APIs consumed by CLI tools and external consumers.
 
 **Pipeline Executor** (`PipelineExecutor`):
 - `execute(taskType, prompt, options?)` — resolves pipeline via Router and converts to DAG-based execution plan via Scheduler
-- Returns `{taskType, description, modelProfile, agents, levels, summary}`
+- `validateAgentBeforeDelegation(agentName)` — validates agent definition before delegation (MEJORA 2)
+- `delegate(agentName, prompt, context)` — validates + delegates to subagent
+- Level execution wrapped with error handling: `PipelineError` levels (CRITICAL/WARNING/INFO), abort/continue-alert/continue semantics (MEJORA 1)
+- Returns `{taskType, description, modelProfile, agents, levels, summary, levelErrors}`
 
 **Task Mapper** (`TaskMapper`):
 - `mapTaskType(taskType)` — maps pipeline task type to model profile (feature→coding, bugfix→coding, refactor→architecture, security→security, deployment→coding, hotfix→quick)
@@ -521,5 +530,5 @@ Orchestrator (agents/orchestrator.md)
 
 ---
 
-*Generated at v2.6.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing.*
-*Last updated: 2026-07-17 (v2.6.0: Guardrails, OPENCODE_BUILTINS filter, AGENTS_ANEX.md v2.0)*
+*Generated at v2.7.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + 6 framework improvements.*
+*Last updated: 2026-07-28 (v2.7.0: Error Handling, Agent Validation, Token Budgeting, VCS Transactions, Prompt Compression, Timeout Degradation)*
