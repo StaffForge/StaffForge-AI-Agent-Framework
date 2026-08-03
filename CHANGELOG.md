@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2.7.2] — 2026-08-03
+
+### Fixed
+- **Windows AGENTS config generation**: dynamic `import()` of `tools/init-agents-config.mjs` now uses `pathToFileURL()` (Node ESM rejects bare `C:\` paths) — AGENTS.md/AGENTS_ANEX.md were silently skipped on Windows
+- **Installer banner version**: no longer hardcoded `v2.6.0`; read dynamically from the root `package.json`
+
+### Changed
+- Version bumped 2.7.1 → 2.7.2
+
 ## [v2.7.1] — 2026-08-03
 
 ### Added
