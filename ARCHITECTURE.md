@@ -1,6 +1,6 @@
 # StaffForge AI Agent Framework — Architecture
 
-> Current state: v2.7.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + Error Handling + Agent Validation + Token Budgeting + VCS Transactions + Prompt Compression + Timeout Degradation.  
+> Current state: v2.7.3 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + Error Handling + Agent Validation + Token Budgeting + VCS Transactions + Prompt Compression + Timeout Degradation.  
 > Active branch: `develop`
 
 ---
@@ -15,7 +15,7 @@
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────┐
-│              tools/lib/agent-registry.mjs                 │
+│              packages/core/lib/registries/agent-registry.mjs                 │
 │  AgentRegistry: load, query, search, resolveDependencies │
 └──────┬──────────────────────────────────────────┬────────┘
        │                                          │
@@ -28,7 +28,7 @@
                                           │
                                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│           tools/lib/adapter-registry.mjs                 │
+│           packages/core/lib/registries/adapter-registry.mjs                 │
 │  AdapterRegistry: lazy-load adapters, export(single/all)│
 └──────────────────────┬──────────────────────────────────┘
                        │
@@ -44,31 +44,31 @@
 
 ## 2. Core Components
 
-### 2.0 Libraries (`tools/lib/`)
+### 2.0 Libraries (`packages/core/lib/`)
 
 Shared programmatic APIs consumed by CLI tools and external consumers.
 
 | Module | File | Exports |
 |---|---|---|---|
-| Agent Registry | `tools/lib/agent-registry.mjs` | `AgentRegistry`, `getAgentRegistry()` |
-| Adapter Registry | `tools/lib/adapter-registry.mjs` | `AdapterRegistry`, `getAdapterRegistry()` |
-| Capability Engine | `tools/lib/capability-engine.mjs` | `CapabilityEngine`, `getCapabilityEngine()` |
-| Router | `tools/lib/router.mjs` | `Router`, `getRouter()` |
-| DAG | `tools/lib/dag.mjs` | `DAG` |
-| Scheduler | `tools/lib/scheduler.mjs` | `Scheduler`, `getScheduler()` |
-| Telemetry Collector | `tools/lib/telemetry/collector.mjs` | `TelemetryCollector`, `getCollector()` |
-| Telemetry Storage | `tools/lib/telemetry/storage.mjs` | `TelemetryStorage`, `getStorage()` |
-| Telemetry Reporter | `tools/lib/telemetry/reporter.mjs` | `TelemetryReporter`, `getReporter()` |
-| Model Registry | `tools/lib/model-registry.mjs` | `ModelRegistry`, `getModelRegistry()` |
-| Model Profile | `tools/lib/model-profile.mjs` | `ModelProfile`, `getModelProfile()` |
-| Model Discovery | `tools/lib/model-discovery.mjs` | `ModelDiscovery`, `getModelDiscovery()` |
-| Selection Engine | `tools/lib/selection-engine.mjs` | `SelectionEngine`, `getSelectionEngine()` |
-| Fallback Engine | `tools/lib/fallback-engine.mjs` | `FallbackEngine`, `getFallbackEngine()` |
-| Learning Engine | `tools/lib/learning-engine.mjs` | `LearningEngine`, `getLearningEngine()` |
-| Model Selector | `tools/lib/model-selector.mjs` | `ModelSelector`, `getModelSelector()` |
-| Pipeline Executor | `tools/lib/pipeline-executor.mjs` | `PipelineExecutor`, `getPipelineExecutor()` |
-| Task Mapper | `tools/lib/task-mapper.mjs` | `TaskMapper`, `getTaskMapper()` |
-| Logger | `tools/lib/logger.mjs` | `Logger`, `getLogger()` |
+| Agent Registry | `packages/core/lib/registries/agent-registry.mjs` | `AgentRegistry`, `getAgentRegistry()` |
+| Adapter Registry | `packages/core/lib/registries/adapter-registry.mjs` | `AdapterRegistry`, `getAdapterRegistry()` |
+| Capability Engine | `packages/core/lib/engines/capability-engine.mjs` | `CapabilityEngine`, `getCapabilityEngine()` |
+| Router | `packages/core/lib/router.mjs` | `Router`, `getRouter()` |
+| DAG | `packages/core/lib/dag.mjs` | `DAG` |
+| Scheduler | `packages/core/lib/scheduler.mjs` | `Scheduler`, `getScheduler()` |
+| Telemetry Collector | `packages/core/lib/telemetry/collector.mjs` | `TelemetryCollector`, `getCollector()` |
+| Telemetry Storage | `packages/core/lib/telemetry/storage.mjs` | `TelemetryStorage`, `getStorage()` |
+| Telemetry Reporter | `packages/core/lib/telemetry/reporter.mjs` | `TelemetryReporter`, `getReporter()` |
+| Model Registry | `packages/core/lib/registries/model-registry.mjs` | `ModelRegistry`, `getModelRegistry()` |
+| Model Profile | `packages/core/lib/model-profile.mjs` | `ModelProfile`, `getModelProfile()` |
+| Model Discovery | `packages/core/lib/model-discovery.mjs` | `ModelDiscovery`, `getModelDiscovery()` |
+| Selection Engine | `packages/core/lib/engines/selection-engine.mjs` | `SelectionEngine`, `getSelectionEngine()` |
+| Fallback Engine | `packages/core/lib/engines/fallback-engine.mjs` | `FallbackEngine`, `getFallbackEngine()` |
+| Learning Engine | `packages/core/lib/engines/learning-engine.mjs` | `LearningEngine`, `getLearningEngine()` |
+| Model Selector | `packages/core/lib/model-selector.mjs` | `ModelSelector`, `getModelSelector()` |
+| Pipeline Executor | `packages/core/lib/pipeline-executor.mjs` | `PipelineExecutor`, `getPipelineExecutor()` |
+| Task Mapper | `packages/core/lib/task-mapper.mjs` | `TaskMapper`, `getTaskMapper()` |
+| Logger | `packages/core/lib/logger.mjs` | `Logger`, `getLogger()` |
 | Error Handler | `packages/core/lib/error-handler.mjs` | `PipelineError`, `handlePipelineError`, `ERROR_LEVELS` |
 | Agent Validator | `packages/core/lib/agent-validator.mjs` | `validateAgent`, `validateAgentRegistry`, `AgentValidationError` |
 | Token Tracker | `packages/core/lib/token-tracker.mjs` | `TokenTracker` |
@@ -154,7 +154,7 @@ Shared programmatic APIs consumed by CLI tools and external consumers.
 - `registerAdapter(provider, adapterFn)` — register custom discovery
 - `discoverAll()` / `discoverProvider(provider)` — run discovery
 - `listProviders()` — registered + file-based adapters
-- Auto-loads adapters from `tools/lib/discovery/*.mjs`
+- Auto-loads adapters from `packages/core/lib/discovery/*.mjs`
 
 **Selection Engine** (`SelectionEngine`):
 - `select(taskType, options?)` — best model for task
@@ -285,7 +285,7 @@ Each exports a default function: `(agents[]) → [{path, content}]`
 | Platform | Output | Format |
 |---|---|---|
 | opencode | 1 file | `opencode.json` |
-| claude-code | 150 files | `CLAUDE.md` + `.claude/rules/*.md` |
+| claude-code | 150 files | `CLAUDE.md` + `.claude/agents/*.md` (symlink to canonical `agents/`) |
 | cursor | 150 files | `.cursor/rules/*.mdc` |
 | copilot | 1 file | `.github/copilot-instructions.md` |
 | aider | 1 file | `.aider.rules.md` |
@@ -342,7 +342,7 @@ Defines 6 task types with DAG pipelines:
 │   ├── copilot/index.mjs
 │   ├── aider/index.mjs
 │   └── gemini-cli/index.mjs
-├── models/                  # Model definitions (23 YAML)
+├── models/                  # Model definitions (22 YAML + profiles.yaml)
 │   ├── profiles.yaml        # 8 task profiles
 │   ├── openai-gpt-4o.yaml   # Model example
 │   └── ...
@@ -480,17 +480,17 @@ Orchestrator (agents/orchestrator.md)
 | `node tools/export.mjs --platform copilot` | ✅ 1 file |
 | `node tools/export.mjs --platform aider` | ✅ 1 file |
 | `node tools/export.mjs --platform gemini-cli` | ✅ 150 files |
-| `tools/lib/agent-registry.mjs` | ✅ AgentRegistry API (load, query, search, resolveDependencies) |
-| `tools/lib/adapter-registry.mjs` | ✅ AdapterRegistry API (lazy-load, export, exportToAll) |
-| `tools/lib/capability-engine.mjs` | ✅ CapabilityEngine (analyzeIntent, scoreAgent, findBestMatch) |
-| `tools/lib/router.mjs` | ✅ Router (resolveTask, buildPipeline, suggestAgents) |
-| `tools/lib/dag.mjs` | ✅ DAG (addNode/Edge, getLevels, topologicalSort, validate, cycle detection) |
-| `tools/lib/scheduler.mjs` | ✅ Scheduler (fromAgentIds, fromRouterPipeline, buildPlan, validatePipeline) |
+| `packages/core/lib/registries/agent-registry.mjs` | ✅ AgentRegistry API (load, query, search, resolveDependencies) |
+| `packages/core/lib/registries/adapter-registry.mjs` | ✅ AdapterRegistry API (lazy-load, export, exportToAll) |
+| `packages/core/lib/engines/capability-engine.mjs` | ✅ CapabilityEngine (analyzeIntent, scoreAgent, findBestMatch) |
+| `packages/core/lib/router.mjs` | ✅ Router (resolveTask, buildPipeline, suggestAgents) |
+| `packages/core/lib/dag.mjs` | ✅ DAG (addNode/Edge, getLevels, topologicalSort, validate, cycle detection) |
+| `packages/core/lib/scheduler.mjs` | ✅ Scheduler (fromAgentIds, fromRouterPipeline, buildPlan, validatePipeline) |
 | `tests/unit/dag.test.mjs` | ✅ 27/27 passed |
 | `tests/unit/scheduler.test.mjs` | ✅ 14/14 passed |
-| `tools/lib/telemetry/collector.mjs` | ✅ TelemetryCollector (startRun, recordAgentCall, recordError, endRun, getReport) |
-| `tools/lib/telemetry/storage.mjs` | ✅ TelemetryStorage (JSON Lines save/load/list/count) |
-| `tools/lib/telemetry/reporter.mjs` | ✅ TelemetryReporter (generateSummary, generateMarkdown, generateJSON) |
+| `packages/core/lib/telemetry/collector.mjs` | ✅ TelemetryCollector (startRun, recordAgentCall, recordError, endRun, getReport) |
+| `packages/core/lib/telemetry/storage.mjs` | ✅ TelemetryStorage (JSON Lines save/load/list/count) |
+| `packages/core/lib/telemetry/reporter.mjs` | ✅ TelemetryReporter (generateSummary, generateMarkdown, generateJSON) |
 | `tests/unit/telemetry.test.mjs` | ✅ 50/50 passed |
 | `tests/unit/registry/AgentRegistry.test.mjs` | ✅ 26/26 passed |
 | `tests/unit/registry/AdapterRegistry.test.mjs` | ✅ 12/12 passed |
@@ -501,16 +501,16 @@ Orchestrator (agents/orchestrator.md)
 | `tests/run-all.mjs` | ✅ 848/848 passed (31 suites) |
 | `tools/generate-docs.mjs` | ✅ DocumentationGenerator (catalog, capabilities, DAG, matrix, architecture) |
 | Tools/lib/logger.mjs | ✅ Logger (debug/info/warn/error, env config) |
-| `tools/lib/pipeline-executor.mjs` | ✅ PipelineExecutor (Router→Scheduler wiring) |
-| `tools/lib/task-mapper.mjs` | ✅ TaskMapper (task-type → model-profile mapping) |
+| `packages/core/lib/pipeline-executor.mjs` | ✅ PipelineExecutor (Router→Scheduler wiring) |
+| `packages/core/lib/task-mapper.mjs` | ✅ TaskMapper (task-type → model-profile mapping) |
 | `tests/unit/pipeline-executor.test.mjs` | ✅ 38/38 passed |
-| `tools/lib/model-registry.mjs` | ✅ ModelRegistry |
-| `tools/lib/model-profile.mjs` | ✅ ModelProfile (matchProfile weighted scoring) |
-| `tools/lib/model-discovery.mjs` | ✅ ModelDiscovery (registerAdapter, discoverAll, auto-load) |
-| `tools/lib/selection-engine.mjs` | ✅ SelectionEngine (select, rankModels, scoreModel) |
-| `tools/lib/fallback-engine.mjs` | ✅ FallbackEngine (4-level chain, executeWithFallback) |
-| `tools/lib/learning-engine.mjs` | ✅ LearningEngine (recordExecution, getModelRanking) |
-| `tools/lib/model-selector.mjs` | ✅ ModelSelector (facade, 4 strategies, execute, estimateCost) |
+| `packages/core/lib/registries/model-registry.mjs` | ✅ ModelRegistry |
+| `packages/core/lib/model-profile.mjs` | ✅ ModelProfile (matchProfile weighted scoring) |
+| `packages/core/lib/model-discovery.mjs` | ✅ ModelDiscovery (registerAdapter, discoverAll, auto-load) |
+| `packages/core/lib/engines/selection-engine.mjs` | ✅ SelectionEngine (select, rankModels, scoreModel) |
+| `packages/core/lib/engines/fallback-engine.mjs` | ✅ FallbackEngine (4-level chain, executeWithFallback) |
+| `packages/core/lib/engines/learning-engine.mjs` | ✅ LearningEngine (recordExecution, getModelRanking) |
+| `packages/core/lib/model-selector.mjs` | ✅ ModelSelector (facade, 4 strategies, execute, estimateCost) |
 | `tests/unit/registry/ModelRegistry.test.mjs` | ✅ 29/29 passed |
 | `tests/unit/registry/ModelProfile.test.mjs` | ✅ 21/21 passed |
 | `tests/unit/registry/ModelDiscovery.test.mjs` | ✅ 15/15 passed |
@@ -522,13 +522,13 @@ Orchestrator (agents/orchestrator.md)
 | `tests/e2e/mil-lifecycle.test.mjs` | ✅ 35/35 passed |
 | `tests/run-all.mjs` | ✅ 848/848 passed (31 suites) |
 | `packages/core/lib/guardrails/` — 3-layer system | ✅ Input (input-sanitizer), Runtime (guardrail-manager), Output (output-dlp, hallucination-check, schema-validator) |
-| Agent categories | ✅ core=9, technology=99, domain=23, utility=14, vcs=5 |
-| Models | ✅ 23 YAML files, 7 providers |
+| Agent categories | ✅ core=9, technology=103, domain=17, utility=16, vcs=5 |
+| Models | ✅ 22 YAML files, 6 providers |
 | VCS abstraction | ✅ 5 provider agents: vcs-git, vcs-svn, vcs-hg, vcs-tfvc, vcs-perforce |
 | Git working tree | ✅ On `develop` |
 | Skills | ✅ 4 skill definitions in `skills/*.md` |
 
 ---
 
-*Generated at v2.7.0 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + 6 framework improvements.*
-*Last updated: 2026-07-28 (v2.7.0: Error Handling, Agent Validation, Token Budgeting, VCS Transactions, Prompt Compression, Timeout Degradation)*
+*Generated at v2.7.3 — C.R.E.A.D.O. methodology + three-layer Guardrails + CapabilityEngine routing + 6 framework improvements.*
+*Last updated: 2026-08-03 (v2.7.3: EALLOWGIT-safe installer, root-layout installs, per-platform agents symlinks, `--force`)*

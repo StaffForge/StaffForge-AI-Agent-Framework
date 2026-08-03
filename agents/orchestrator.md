@@ -207,7 +207,7 @@ guardrails:
      ```text
      PROJECT
      - Name: StaffForge AI Agent Framework
-     - Version: 2.6.3
+     - Version: 2.7.3
      - Stack: Node.js ESM, YAML frontmatter agents
 
      PROJECT_RULES

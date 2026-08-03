@@ -59,26 +59,36 @@ examples/         ← Usage examples
 
 ### From any project — **one command, all OS**
 
+Two equivalent install methods:
+
+**A) npm registry (recommended)** — no git dependency, EALLOWGIT-safe (works on npm ≥ 11.10 with `allow-git=none`):
+
+```bash
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework
+```
+
+**B) GitHub direct** — installs straight from the repo (may be blocked by npm ≥ 11.10's `allow-git` policy on some setups):
+
 ```bash
 npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework
 ```
 
-Works on Linux, macOS, and Windows — Node.js ≥ 18 is the only requirement.
-(If your npm version supports it, you may also use `npx github:StaffForge/...`.)
+Both work on Linux, macOS, and Windows — Node.js ≥ 18 is the only requirement.
+(If your npm version supports it, you may also use `npx @staffforge/staffforge-ai-agent-framework` or `npx github:StaffForge/...`.)
 
 Interactive prompts ask for:
 - **Platform** — opencode, claude-code, cursor, copilot, aider, gemini-cli, or all
 - **Default agent** — orchestrator, build, or plan
-- **Location** — project directory or global (~/.config/staffforge/)
+- **Location** — project root (default), isolated `./staffforge/`, or global (~/.config/staffforge/)
 - **VCS provider** — git, svn, hg, tfvc, perforce, or custom
 - **Workflow** — git-flow, github-flow, gitlab-flow, trunk-based, or custom
 
-After install, config files are placed in your project and a `.staffforge-install.json`
+After install, config files are placed in your project root (no `./staffforge/` folder is left behind), `.claude/agents` is a symlink to the canonical `agents/` dir, and a `.staffforge-install.json`
 is saved so re-running detects previous settings:
 
 ```bash
 # Update to latest agents (detects previous config):
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework
 # → Previous: opencode (agent: orchestrator)
 #   Reinstall? [Y/n]:  ← press Enter
 ```
@@ -93,10 +103,10 @@ All options can be passed as flags for automation:
 
 ```bash
 # Minimal: OpenCode + orchestrator (defaults for the rest)
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework --platform opencode --agent orchestrator
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework --platform opencode --agent orchestrator
 
 # Full config
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework \
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework \
   --platform opencode \
   --agent orchestrator \
   --out ./myproject \
@@ -105,13 +115,16 @@ npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework \
   -y
 
 # Specific platform + agent
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework --platform claude-code --agent build
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework --platform claude-code --agent build
 
-# All platforms at once
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework --platform all
+# All platforms at once (files land in project root; agents/ at root; per-platform symlinks)
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework --platform all
 
 # All defaults (equivalent to interactive with all defaults)
-npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework -y
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework -y
+
+# Regenerate existing files (backs up <file>.bak before overwriting)
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework --force
 ```
 
 #### CLI reference
@@ -169,9 +182,9 @@ node tools/export.mjs --platform opencode
 | `opencode.json` | Agent config (modes, permissions) |
 
 Agents with `mode: primary` appear in the **Tab** cycle (orchestrator, build, plan).
-Agents with `mode: subagent` appear in the **@** autocomplete menu (134 specialized agents).
+Agents with `mode: subagent` appear in the **@** autocomplete menu (148 specialized agents).
 
-> The `--out` flag copies the generated file elsewhere. For normal use, run without `--out` — the file is placed at `adapters/opencode/output/` and then copied to the project root by the installer.
+> The installer (v2.7.3+) writes config files directly to the target (project root for single-platform installs) — no `adapters/opencode/output/` staging step. Use `--out <dir>` only to redirect the output elsewhere.
 
 ---
 
@@ -184,9 +197,10 @@ node tools/export.mjs --platform claude-code
 | Output | Purpose |
 |--------|---------|
 | `CLAUDE.md` | Orchestrator instructions (top-level rules) |
-| `.claude/rules/<agent>.md` | One file per subagent |
+| `.claude/agents/<agent>.md` | Symlink to canonical `agents/` (single source) |
+| `.claude/rules/*.mdc` | Always-on rules (no agents dumped here) |
 
-Claude Code reads `CLAUDE.md` automatically from the project root. Subagent rules in `.claude/rules/` are loaded as additional instructions when the relevant agent is invoked.
+Claude Code reads `CLAUDE.md` automatically from the project root. The `.claude/agents/` folder is a symlink to the canonical `agents/` directory (junction on Windows), so subagents stay in sync with the framework source.
 
 Copy the output to your project root:
 
@@ -313,7 +327,7 @@ After selection, the installer:
 | **orchestrator** | ✓ default | ✓ | Full tools |
 | **build** | ✓ | ✓ | Full tools |
 | **plan** | ✓ | ✓ | Read-only |
-| 147 subagents | — | ✓ | Varies |
+| 148 subagents | — | ✓ | Varies |
 
 - **Tab** — Cycle: orchestrator → build → plan
 - **@name** — Invoke any subagent (e.g., `@security`, `@testing`, `@ci`, `@docker`, `@flask`, `@react`, `@postgres`)
@@ -371,7 +385,11 @@ The orchestrator:
 ### One-line install (any project, no clone needed)
 
 ```bash
-npx github:StaffForge/StaffForge-AI-Agent-Framework [options]
+# npm registry (recommended, EALLOWGIT-safe):
+npm exec --yes -- @staffforge/staffforge-ai-agent-framework [options]
+
+# GitHub direct (alternative):
+npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework [options]
 ```
 
 ### After cloning the repo
@@ -381,8 +399,6 @@ npx github:StaffForge/StaffForge-AI-Agent-Framework [options]
 npm install              # Install all dependencies (tools/ included)
 npm run setup            # Interactive installer
 npm run setup:opencode   # Non-interactive: OpenCode + orchestrator
-npm run setup:build      # Non-interactive: OpenCode + build agent
-npm run setup:plan       # Non-interactive: OpenCode + plan agent
 npm run export:opencode  # Export to OpenCode
 npm run export:claude    # Export to Claude Code
 npm run export:cursor    # Export to Cursor
@@ -415,13 +431,13 @@ STAFFFORGE_LOG_LEVEL=error node tools/validate.mjs                    # Errors o
 
 ## opencode.json
 
-Not committed to repo. Generate with `node install.mjs`, `node tools/export.mjs --platform opencode`, or `npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework`.
+Not committed to repo. Generate with `node install.mjs`, `node tools/export.mjs --platform opencode`, or `npm exec --yes -- @staffforge/staffforge-ai-agent-framework`.
 
 ## Model Selection Layer
 
 The framework includes a Model Selection Layer for optimal model selection:
 
-- **23 model definitions** across 7 providers (OpenAI, Anthropic, Google, OpenRouter, Ollama, OpenCode)
+- **22 model definitions** across 6 providers (OpenAI, Anthropic, Google, OpenRouter, Ollama, OpenCode)
 - **8 task profiles** in `models/profiles.yaml` mapping task types to preferred model families
 - **Selection Engine**: weighted scoring (profile fit, capabilities, priority, cost, reasoning)
 - **Fallback Engine**: 4-level chain (primary → same-provider → other-provider → free)
@@ -435,7 +451,7 @@ See `ARCHITECTURE.md` §2 for full API reference.
 ## Requirements
 
 - **Node.js ≥ 18** (Linux, macOS, or Windows)
-- No other runtime dependency — the installer (`npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework`) works standalone
+- No other runtime dependency — the installer (`npm exec --yes -- @staffforge/staffforge-ai-agent-framework`) works standalone
 - A supported AI coding assistant already installed for whichever platform(s) you target (OpenCode, Claude Code, Cursor, GitHub Copilot, Aider, or Gemini CLI)
 
 ## Testing

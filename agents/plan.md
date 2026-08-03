@@ -112,7 +112,7 @@ Apply these `@prompt-base` rules to ALL output. Never deviate.
 ```text
 PROJECT
 - Name: StaffForge AI Agent Framework
-- Version: 2.6.0
+- Version: 2.7.3
 
 DECISIONS
 - Plan: {objective summary}
