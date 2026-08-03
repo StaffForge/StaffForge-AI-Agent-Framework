@@ -2,7 +2,7 @@
 /**
  * installer.mjs — StaffForge AI Agent Framework bootstrap installer.
  *
- * Bootstraps @staffforge/staffforge-ai-agent-framework (v2.7.0) in any
+ * Bootstraps @staffforge/staffforge-ai-agent-framework (v2.7.4) in any
  * environment via a three-strategy cascade:
  *   A) npm direct install of the git dependency (allow-git flag by npm
  *      version: npm >= 11.10 -> --allow-git=all, npm < 11.10 -> no flag)
@@ -36,7 +36,7 @@ import { createInterface } from 'node:readline/promises';
 
 const GIT_URL =
   'https://github.com/StaffForge/StaffForge-AI-Agent-Framework.git';
-const RELEASE_TAG = 'v2.7.0';
+const RELEASE_TAG = 'v2.7.4';
 const NPM_SPEC = `github:StaffForge/StaffForge-AI-Agent-Framework#${RELEASE_TAG}`;
 const TARBALL_URL =
   `https://codeload.github.com/StaffForge/StaffForge-AI-Agent-Framework/tar.gz/refs/tags/${RELEASE_TAG}`;
@@ -400,7 +400,7 @@ function renderAgentsMd(config) {
 You are the ${config.agent} agent for the ${config.platform} platform.
 
 ## Context
-- Framework: ${PKG_NAME} v2.7.0
+- Framework: ${PKG_NAME} v2.7.4
 - Platform: ${config.platform}
 - Active agent: ${config.agent}
 - Language: ${config.language}
