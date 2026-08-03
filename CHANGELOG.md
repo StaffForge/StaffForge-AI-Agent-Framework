@@ -1,5 +1,14 @@
 # Changelog
 
+## [v2.7.1] — 2026-08-03
+
+### Added
+- `installer.mjs` — EALLOWGIT-safe cross-platform bootstrap installer (strategy cascade A/B/C: npm-git → git-clone → codeload tarball; tag-pinned `v2.7.0`)
+- `installer.mjs` added to package `files[]` for npm distribution
+
+### Changed
+- Version bumped 2.7.0 → 2.7.1
+
 ## [v2.7.0] — 2026-07-28
 
 ### Added
