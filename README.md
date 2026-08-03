@@ -236,11 +236,15 @@ cp -r adapters/cursor/output/.cursor .
 node tools/export.mjs --platform copilot
 ```
 
+Three layers are generated (see AGENTS.md "Copilot Architecture"):
+
 | Output | Purpose |
 |--------|---------|
-| `.github/copilot-instructions.md` | All agents concatenated as instructions |
+| `.github/copilot-instructions.md` | **NEUTRAL** project context (`applyTo: "**"`) — does NOT embed agent bodies |
+| `.github/agents/*.agent.md` | All 150 agents `@mention`-able, including **`@orchestrator`** (full prompt) |
+| `.github/instructions/*.instructions.md` | Skills (loaded by file glob) |
 
-Copilot reads `.github/copilot-instructions.md` automatically when it exists in the project. All 150 agents are included in a single file with `---` separators.
+> **How to use:** `copilot-instructions.md` is intentionally neutral because `applyTo: "**"` applies to every Copilot conversation (including built-in `@ask`, `@plan`, `@workspace`) — embedding the orchestrator would override them. The **main agent is `@orchestrator`**: invoke it to run the full multi-agent pipeline; its complete rules load from `.github/agents/orchestrator.agent.md`. Technology agents (`@python`, `@typescript`, `@react`, etc.) are available via `@mention`.
 
 Copy the output to your project root:
 
