@@ -1,5 +1,17 @@
 # Changelog
 
+## [v2.7.3] — 2026-08-03
+
+### Added
+- **Root-layout installs** (`--platform all`): platform files and `agents/` are now written to the project root instead of a `./staffforge/` subfolder; no temporary folder is left behind
+- **Per-platform agents symlinks**: `.claude/agents` is a symlink to the canonical `agents/` dir (junction on Windows; fallback to copy if symlink creation fails), eliminating duplicated agent files
+- **`--force, -f` flag**: overwrite existing generated files (creates `<file>.bak` backups); without it, existing files are skipped with a warning
+
+### Changed
+- **Location prompt**: options are now `1) Project root (./)` (default), `2) Isolated (./staffforge/)`, `3) Global (~/.config/staffforge/)`
+- **claude-code integration test**: now symlink-aware, asserts canonical `a11y.md` through `.claude/agents`
+- Version bumped 2.7.2 → 2.7.3
+
 ## [v2.7.2] — 2026-08-03
 
 ### Fixed
