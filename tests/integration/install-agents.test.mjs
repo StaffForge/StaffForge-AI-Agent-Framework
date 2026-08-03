@@ -64,7 +64,10 @@ function runInstallInProject(platform) {
   rmSync(project, { recursive: true, force: true });
 }
 
-// ── Test 2: claude-code uses .claude/agents/ (not .claude/rules/) ──
+// ── Test 2: claude-code uses .claude/agents/ (symlink → canonical agents/) ──
+// The claude-code loader consumes the canonical agents/*.md directly, so
+// .claude/agents is a symlink (or fallback copy) to the canonical agents/ dir.
+// Canonical filenames are lower-case (a11y.md, not A11y.md).
 {
   const { project, result } = runInstallInProject('claude-code');
   assert(result.status === 0, 'claude-code install exits 0');
@@ -72,20 +75,17 @@ function runInstallInProject(platform) {
   const agentsDir = join(project, '.claude', 'agents');
   assert(existsSync(agentsDir), 'claude-code creates .claude/agents/');
 
-  if (existsSync(agentsDir)) {
-    const files = readdirSync(agentsDir).filter((f) => f.endsWith('.md'));
-    assert(files.length >= 140, 'claude-code .claude/agents/ has ~141 agent files (' + files.length + ')');
-    assert(files.includes('A11y.md'), 'claude-code has A11y.md');
+  const a11yPath = join(agentsDir, 'a11y.md');
+  assert(existsSync(a11yPath), 'claude-code exposes canonical a11y.md via .claude/agents/');
 
-    const a11y = readFileSync(join(agentsDir, 'A11y.md'), 'utf-8');
-    assert(a11y.startsWith('---'), 'claude-code A11y.md has frontmatter');
-    assert(a11y.includes('name: A11y'), 'claude-code A11y.md frontmatter has name');
-    assert(a11y.includes('# Accessibility'), 'claude-code A11y.md contains agent body');
-    assert(
-      a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
-      'claude-code A11y.md contains rules/guardrails',
-    );
-  }
+  const a11y = readFileSync(a11yPath, 'utf-8');
+  assert(a11y.startsWith('---'), 'claude-code a11y.md has frontmatter');
+  assert(a11y.includes('name: A11y'), 'claude-code a11y.md frontmatter has name');
+  assert(a11y.includes('# Accessibility'), 'claude-code a11y.md contains agent body');
+  assert(
+    a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
+    'claude-code a11y.md contains rules/guardrails',
+  );
 
   // Must NOT dump agents into .claude/rules/ (that's for always-on rules)
   const rulesDir = join(project, '.claude', 'rules');

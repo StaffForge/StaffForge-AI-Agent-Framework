@@ -28,6 +28,7 @@ import {
   cpSync,
   statSync,
   copyFileSync,
+  symlinkSync,
 } from 'node:fs';
 import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -71,6 +72,7 @@ OPTIONS
                       (opencode, claude-code, cursor, copilot, aider, gemini-cli, all)
   --agent <name>      Default agent (orchestrator only; build/plan are @subagents)
   --out <dir>         Output directory (default: current directory)
+  --force, -f        Overwrite existing generated files (backs up <file>.bak)
   --vcs <name>        VCS provider (git, svn, hg, tfvc, perforce, custom)
   --workflow <name>   Workflow preset (git-flow, github-flow, gitlab-flow, trunk-based, custom)
   --yes, -y           Skip interactive prompts, use defaults
@@ -96,6 +98,10 @@ function parseArgs() {
         break;
       case '--out':
         o.out = a[++i];
+        break;
+      case '--force':
+      case '-f':
+        o.force = true;
         break;
       case '--vcs':
         o.vcs = a[++i];
@@ -384,13 +390,25 @@ const GENERATORS = {
 };
 
 // ── Write output files ──
-function writeFiles(files, outDir) {
+function writeFiles(files, outDir, o = {}) {
   let count = 0;
+  let skipped = 0;
   for (const f of files) {
     const fp = join(outDir, f.path);
     mkdirSync(dirname(fp), { recursive: true });
+    if (existsSync(fp)) {
+      if (!o.force) {
+        skipped++;
+        console.log(`  ∟ skip ${f.path} (exists; use --force to overwrite)`);
+        continue;
+      }
+      copyFileSync(fp, `${fp}.bak`);
+    }
     writeFileSync(fp, f.content);
     count++;
+  }
+  if (skipped > 0) {
+    console.log(`  ⚠ ${skipped} existing file(s) skipped — use --force to regenerate`);
   }
   return count;
 }
@@ -406,6 +424,32 @@ function copyAgents(src, dest) {
   rmSync(tgt, { recursive: true, force: true });
   cpSync(src, tgt, { recursive: true });
   return readdirSync(tgt).filter((f) => f.endsWith('.md')).length;
+}
+
+// ── Per-platform agents symlink (deduplicate) ──
+// Platforms whose loader consumes the canonical agents/*.md directly get a
+// symlink (junction on Windows) to the root agents/ dir instead of duplicated
+// copies. Platforms needing a transformed format keep their generated files.
+// Returns a description string, or null when not applicable.
+function linkPlatformAgents(outDir, platform, rootAgents) {
+  const agentsRel = {
+    'claude-code': '.claude/agents',
+  }[platform];
+  if (!agentsRel) return null;
+  const linkDir = join(outDir, agentsRel);
+  const parent = dirname(linkDir);
+  mkdirSync(parent, { recursive: true });
+  rmSync(linkDir, { recursive: true, force: true });
+  try {
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+    const target =
+      linkType === 'junction' ? rootAgents : relative(parent, rootAgents) || '.';
+    symlinkSync(target, linkDir, linkType);
+    return `${agentsRel} → symlink → ${relative(outDir, rootAgents) || 'agents'}`;
+  } catch (err) {
+    cpSync(rootAgents, linkDir, { recursive: true });
+    return `${agentsRel} → copy (symlink failed: ${err.message})`;
+  }
 }
 
 // ── Prev config ──
@@ -470,10 +514,13 @@ async function askAgent() {
 
 async function askLocation() {
   console.log('\nLocation:');
-  console.log('  1) Project  (./staffforge/)');
-  console.log('  2) Global   (~/.config/staffforge/)');
-  const c = (await ask('\n? [1]: ')).trim();
-  return c === '2' ? join(env.HOME || env.USERPROFILE || '~', '.config', 'staffforge') : join(CWD, 'staffforge');
+  console.log('  1) Project root (./)');
+  console.log('  2) Isolated    (./staffforge/)');
+  console.log('  3) Global      (~/.config/staffforge/)');
+  const c = (await ask('\n? [1]: ')).trim() || '1';
+  if (c === '2') return join(CWD, 'staffforge');
+  if (c === '3') return join(env.HOME || env.USERPROFILE || '~', '.config', 'staffforge');
+  return CWD;
 }
 
 async function askVcs() {
@@ -622,7 +669,7 @@ async function main() {
       }
     }
     const files = pl === 'opencode' ? gen(agents, agent) : gen(agents);
-    const count = writeFiles(files, outDir);
+    const count = writeFiles(files, outDir, { force: o.force });
     const outRel = outDir === CWD ? '.' : relative(CWD, outDir) || outDir;
     console.log(`  ✓ ${count} file(s) → ${outRel}`);
   }
@@ -649,6 +696,14 @@ async function main() {
       }
     } else {
       copyAgents(agentsDir, outDir);
+    }
+  }
+
+  // ── Per-platform agents symlinks (single source: root agents/) ──
+  if (outDir === CWD && CWD !== fw) {
+    for (const pl of platforms) {
+      const note = linkPlatformAgents(outDir, pl, join(CWD, 'agents'));
+      if (note) console.log(`  ✓ ${note}`);
     }
   }
 
