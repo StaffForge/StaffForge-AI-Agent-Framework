@@ -43,9 +43,7 @@ const CWD = cwd();
 // reflects the deployed release instead of a stale hardcoded literal.
 const FW_VERSION = (() => {
   try {
-    return JSON.parse(
-      readFileSync(join(CLI_DIR, '..', '..', 'package.json'), 'utf8')
-    ).version;
+    return JSON.parse(readFileSync(join(CLI_DIR, '..', '..', 'package.json'), 'utf8')).version;
   } catch {
     return 'unknown';
   }
@@ -442,8 +440,7 @@ function linkPlatformAgents(outDir, platform, rootAgents) {
   rmSync(linkDir, { recursive: true, force: true });
   try {
     const linkType = process.platform === 'win32' ? 'junction' : 'dir';
-    const target =
-      linkType === 'junction' ? rootAgents : relative(parent, rootAgents) || '.';
+    const target = linkType === 'junction' ? rootAgents : relative(parent, rootAgents) || '.';
     symlinkSync(target, linkDir, linkType);
     return `${agentsRel} → symlink → ${relative(outDir, rootAgents) || 'agents'}`;
   } catch (err) {
@@ -750,9 +747,7 @@ async function main() {
   // reader on process.stdin (which caused duplicate character echo on input).
   try {
     const { generateAgentsConfig } = await import(
-      pathToFileURL(
-        join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')
-      ).href
+      pathToFileURL(join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')).href
     );
     await generateAgentsConfig({ outDir: CWD, yes: o.yes, rl, ask });
   } catch (err) {

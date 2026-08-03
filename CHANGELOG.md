@@ -1,5 +1,19 @@
 # Changelog
 
+## [v2.7.4] — 2026-08-03
+
+### Fixed
+- **CI format gate**: `packages/cli/install.mjs` reformatted with Prettier (CI `npm run format` was failing)
+- **Installer bootstrap pin**: `installer.mjs` `RELEASE_TAG` updated `v2.7.0` → `v2.7.4` (bootstrap was downloading the outdated v2.7.0 release; banner now reports the current version)
+- **Redundant npm scripts**: removed `setup:build` / `setup:plan` (identical duplicates of `setup:opencode` — all ran `--agent orchestrator`)
+
+### Added
+- **npm registry install method** documented as the recommended, EALLOWGIT-safe alternative: `npm exec --yes -- @staffforge/staffforge-ai-agent-framework`
+- **Docs aligned to v2.7.3**: ARCHITECTURE.md (real `packages/core/lib/**` paths, counts, v2.7.3), AGENTS.md (4 skills, 6 providers), ORCHESTRATOR_MATRIX.md (agent category counts), PROJECT_RULES.md, agent version headers, README (`.claude/agents` symlink, project-root location, 148 subagents / 22 models)
+
+### Changed
+- Version bumped 2.7.3 → 2.7.4
+
 ## [v2.7.3] — 2026-08-03
 
 ### Added

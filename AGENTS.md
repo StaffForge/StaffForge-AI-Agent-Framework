@@ -6,12 +6,12 @@ Multi-provider agent framework. Canonical agents in `agents/*.md`, skills in `sk
 
 ```
 agents/             — 150 agent definitions with YAML frontmatter (mode, description, tools)
-skills/             — 3 skill definitions with YAML frontmatter (name, description, keywords, globs)
+skills/             — 4 skill definitions with YAML frontmatter (name, description, keywords, globs)
 adapters/            — Platform exporters per platform (opencode, claude-code, cursor, copilot, aider, gemini-cli)
 schemas/             — JSON Schema for validation (agent.schema.json, model.schema.json, skill.schema.json)
 templates/           — Scaffolding templates for new agents and skills (agent.md, skill.md)
-tools/               — Node.js CLI: validate, export, init-agent, init-skill, install, test, skill-loader
-models/              — Model definitions (22 files, 7 providers) + task profiles (profiles.yaml)
+tools/               — Node.js CLI: validate, export, init-agent, init-skill, install, run-pipeline, init-agents-config, skill-loader
+models/              — Model definitions (22 files, 6 providers) + task profiles (profiles.yaml)
 ORCHESTRATOR_MATRIX.md — task → pipeline routing with VCS Flow integration
 PROJECT_RULES.md     — Dynamically generated project rules (addendum to AGENTS.md, created by @project-rules)
 ```
@@ -103,7 +103,7 @@ author: StaffForge
 1. Define skill in `skills/<name>.md` (or use `npm run init-skill <name>`)
 2. Validate with `npm run validate` (validates frontmatter + non-empty body)
 3. Export with `npm run export` (generates platform-specific skill files in each adapter's output)
-4. Install with `node tools/install.mjs --platform <name>` (copies output to project root)
+4. Install with `node install.mjs --platform <name>` (copies output to project root; v2.7.3+ writes directly to target with per-platform agents symlinks)
 
 Each platform adapter transforms the canonical skill file into its native format:
 - **opencode**: `.opencode/skills/<name>.md` + `opencode.json` with `skills.paths`
