@@ -336,7 +336,7 @@ After selection, the installer:
 ## Architecture
 
 - **Orchestrator** (default agent) — receives all requests, detects task type and technologies, creates git flow branches, routes pipelines, communicates with the user
-- **Subagents** (147) — specialized roles (language experts, frameworks, databases, infrastructure, testing, security, CI/CD, etc.)
+- **Subagents** (148) — specialized roles (language experts, frameworks, databases, infrastructure, testing, security, CI/CD, etc.)
 - **Only the orchestrator** may talk to the user, write files, or manage git
 - Subagents run in **parallel** when they have no dependency on each other (DAG-based execution)
 
