@@ -30,13 +30,25 @@ import {
   copyFileSync,
 } from 'node:fs';
 import { join, dirname, resolve, relative, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
 import { env, argv, exit, cwd, stdout } from 'node:process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = resolve(__dirname);
 const CWD = cwd();
+
+// Framework version — read from the root package.json so the installer banner
+// reflects the deployed release instead of a stale hardcoded literal.
+const FW_VERSION = (() => {
+  try {
+    return JSON.parse(
+      readFileSync(join(CLI_DIR, '..', '..', 'package.json'), 'utf8')
+    ).version;
+  } catch {
+    return 'unknown';
+  }
+})();
 
 // ── Config ──
 const CONFIG_FILE = join(CWD, '.staffforge-install.json');
@@ -513,7 +525,7 @@ async function main() {
     return;
   }
 
-  console.log(`\nStaffForge AI Agent Framework — Installer v2.6.0\n`);
+  console.log(`\nStaffForge AI Agent Framework — Installer v${FW_VERSION}\n`);
 
   // Find framework directory
   let fw = findFwDir();
@@ -683,7 +695,9 @@ async function main() {
   // reader on process.stdin (which caused duplicate character echo on input).
   try {
     const { generateAgentsConfig } = await import(
-      join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')
+      pathToFileURL(
+        join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')
+      ).href
     );
     await generateAgentsConfig({ outDir: CWD, yes: o.yes, rl, ask });
   } catch (err) {
