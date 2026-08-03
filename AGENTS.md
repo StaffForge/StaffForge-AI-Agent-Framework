@@ -169,15 +169,14 @@ Each platform adapter generates platform-specific configuration files from the c
 
 Three layers with distinct scopes:
 
-**Layer 1 — `.github/copilot-instructions.md` (default agent)**
-- Contains the **orchestrator's full prompt** — makes `@orchestrator` the default chat experience
-- Has `applyTo: "**"` → applies to ALL Copilot conversations (including `@ask`, `@plan`)
-- Built-in agents (`@ask`, `@plan`, `@workspace`) **remain in the dropdown** — they are NOT removed, but they will read the orchestrator context as base instructions
-- Tradeoff accepted: default = orchestrator, at the cost of @ask/@plan sharing the same base context
+**Layer 1 — `.github/copilot-instructions.md` (NEUTRAL project context — NOT the orchestrator)**
+- **Intentionally neutral**: it has `applyTo: "**"` → applies to EVERY Copilot conversation, including the built-in `@ask`, `@plan`, and `@workspace`. Embedding the orchestrator's identity here would **override Copilot's built-in agents** — so this file carries **only project-level context** (framework name + how to use it).
+- It tells Copilot: *"Use `@orchestrator` for multi-agent pipeline execution."*
+- **The main/primary agent is `@orchestrator`**: its **full prompt lives in `.github/agents/orchestrator.agent.md`** and is applied whenever you invoke `@orchestrator`. Copilot's default chat (`@ask`) gets project context only — for the full framework pipeline, always use `@orchestrator`.
 
 **Layer 2 — `.github/agents/*.agent.md` (all agents @mentionable)**
 - **Every** agent gets its own `.agent.md` file — all are available via `@mention`
-- This includes `@orchestrator` (also available via @mention) plus `@python`, `@typescript`, `@react`, etc.
+- This includes `@orchestrator` (**the primary agent**, with its complete prompt) plus `@python`, `@typescript`, `@react`, etc.
 - Built-in agents (`@ask`, `@plan`, `@workspace`) coexist with custom agents in the @mention dropdown
 - Only agents in `.github/agents/` appear in the @mention list; the 150+ files do NOT override built-in agents
 
