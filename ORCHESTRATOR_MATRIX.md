@@ -5,14 +5,14 @@
 > Sequential `→` means the previous step must complete before the next begins.
 >
 > **Agent categories:** See `agents/*.md` frontmatter `category` field.
-> - `core` (10): Pipeline orchestrators, governance, CI/CD watchdog
+> - `core` (9): Pipeline orchestrators, governance, CI/CD watchdog
 > - `vcs` (5): VCS provider agents (git, svn, hg, tfvc, perforce)
-> - `technology` (99): Languages, frameworks, databases, tools
-> - `domain` (23): Discipline specialists (database, ML, networking, etc.)
-> - `utility` (11): Cross-cutting concerns (debugging, refactor, security audit)
+> - `technology` (103): Languages, frameworks, databases, tools
+> - `domain` (17): Discipline specialists (database, ML, networking, etc.)
+> - `utility` (16): Cross-cutting concerns (debugging, refactor, security audit)
 >
 > The Router uses `CapabilityEngine` to match technology agents to prompt intent.
-> See `tools/lib/capability-engine.mjs` and `tools/lib/router.mjs`.
+> See `packages/core/lib/engines/capability-engine.mjs` and `packages/core/lib/router.mjs`.
 
 ## VCS Flow Integration
 
