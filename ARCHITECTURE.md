@@ -287,7 +287,7 @@ Each exports a default function: `(agents[]) → [{path, content}]`
 | opencode | 1 file | `opencode.json` |
 | claude-code | 150 files | `CLAUDE.md` + `.claude/agents/*.md` (symlink to canonical `agents/`) |
 | cursor | 150 files | `.cursor/rules/*.mdc` |
-| copilot | 1 file | `.github/copilot-instructions.md` |
+| copilot | 152+ files | `.github/copilot-instructions.md` (neutral) + `.github/agents/*.agent.md` (150, incl. `@orchestrator`) + `.github/instructions/*.instructions.md` (skills) |
 | aider | 1 file | `.aider.rules.md` |
 | gemini-cli | 150 files | `.gemini/*.md` |
 
@@ -477,7 +477,7 @@ Orchestrator (agents/orchestrator.md)
 | `node tools/export.mjs --platform opencode` | ✅ 1 file (with OPENCODE_BUILTINS filter) |
 | `node tools/export.mjs --platform claude-code` | ✅ 150 files |
 | `node tools/export.mjs --platform cursor` | ✅ 150 files |
-| `node tools/export.mjs --platform copilot` | ✅ 1 file |
+| `node tools/export.mjs --platform copilot` | ✅ 152+ files (neutral instructions + 150 agents + skills) |
 | `node tools/export.mjs --platform aider` | ✅ 1 file |
 | `node tools/export.mjs --platform gemini-cli` | ✅ 150 files |
 | `packages/core/lib/registries/agent-registry.mjs` | ✅ AgentRegistry API (load, query, search, resolveDependencies) |

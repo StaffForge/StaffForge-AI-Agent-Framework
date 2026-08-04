@@ -1,21 +1,24 @@
 /**
  * GitHub Copilot adapter — generates:
- *   .github/copilot-instructions.md              (orchestrator's full prompt — makes it the DEFAULT agent)
+ *   .github/copilot-instructions.md              (NEUTRAL project context — NOT the orchestrator)
  *   .github/agents/*.agent.md                    (ALL agents @mention-able, including orchestrator)
  *   .github/instructions/<skill>.instructions.md  (Skills as topic-specific instructions)
  *
  * Accepts skills as second parameter.
  *
  * ARCHITECTURE (per AGENTS.md Copilot Architecture):
- *   Layer 1 — copilot-instructions.md (default agent)
- *     Contains the orchestrator's full prompt — makes @orchestrator the default
- *     chat experience. Has applyTo: "**" → applies to ALL Copilot conversations.
- *     Built-in agents (@ask, @plan, @workspace) remain in the dropdown but share
- *     the orchestrator's base context as instructions.
+ *   Layer 1 — copilot-instructions.md (NEUTRAL context)
+ *     Intentionally neutral. It has applyTo: "**" → applies to EVERY Copilot
+ *     conversation (including built-in @ask, @plan, @workspace). Embedding the
+ *     orchestrator identity here would override Copilot's built-in agents.
+ *     This file provides only project-level context. The main agent is
+ *     @orchestrator — its FULL prompt lives in .github/agents/orchestrator.agent.md
+ *     and is applied when you invoke @orchestrator.
  *
  *   Layer 2 — .github/agents/*.agent.md (all agents @mention-able)
  *     Every agent gets its own .agent.md. All 150+ agents are @mention-able
- *     alongside @ask, @plan, and @workspace.
+ *     alongside @ask, @plan, and @workspace. @orchestrator (the primary agent)
+ *     is here with its complete body.
  *
  *   Layer 3 — .github/instructions/*.instructions.md (skills)
  *     Load conditionally based on file glob patterns.
@@ -55,23 +58,21 @@ function buildAgentFrontmatter(agent) {
 export default function copilotAdapter(agents, skills = []) {
   const files = [];
 
-  // ── 1. copilot-instructions.md — orchestrator as DEFAULT agent ─────────
-  // Per AGENTS.md Copilot Architecture — Layer 1:
-  // Contains the orchestrator's full prompt — makes @orchestrator the default
-  // chat experience. Has applyTo: "**" → applies to ALL Copilot conversations.
-  // Tradeoff: built-in agents (@ask, @plan, @workspace) remain in the dropdown
-  // but share the orchestrator's base context.
-  const orchestrator = agents.find((a) => a.id === 'orchestrator');
-  const instructionsBody = orchestrator
-    ? orchestrator.body
-    : 'StaffForge AI Agent Framework — Multi-provider agent system.';
+  // ── 1. copilot-instructions.md — NEUTRAL project context ───────────────
+  // CRITICAL: applyTo: "**" applies to EVERY Copilot conversation (including
+  // built-in @ask, @plan, @workspace). We MUST NOT put the orchestrator's
+  // identity here or it overrides Copilot's built-in agents. This file stays
+  // neutral — project-level context only. The @orchestrator rules live in
+  // .github/agents/orchestrator.agent.md and apply when @orchestrator is used.
   files.push({
     path: '.github/copilot-instructions.md',
     content: `---
 applyTo: "**"
 ---
 
-${instructionsBody}
+StaffForge AI Agent Framework — Multi-provider agent system.
+Use @orchestrator for multi-agent pipeline execution.
+Technology agents (@python, @typescript, @react, etc.) are available via @mention.
 `,
   });
 

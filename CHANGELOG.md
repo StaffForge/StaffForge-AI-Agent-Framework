@@ -1,5 +1,16 @@
 # Changelog
 
+## [v2.7.5] — 2026-08-03
+
+### Fixed
+- **Copilot instructions are consistently NEUTRAL**: `adapters/copilot/index.mjs` no longer embeds the full orchestrator body into `.github/copilot-instructions.md`. Both install paths (installer + `tools/export.mjs`) now generate the same neutral project-context file (`applyTo: "**"` applies to every Copilot conversation, including built-in `@ask`, `@plan`, `@workspace` — embedding the orchestrator would override them). The **main agent is `@orchestrator`**, whose complete prompt lives in `.github/agents/orchestrator.agent.md` and loads when invoked via `@orchestrator`.
+
+### Added
+- **Docs**: Copilot Architecture in AGENTS.md/README.md/ARCHITECTURE.md now clearly documents the neutral Layer 1, the 3-layer output (instructions + `.github/agents/*.agent.md` + `.github/instructions/*.instructions.md`), and `@orchestrator` as the primary agent to invoke for the multi-agent pipeline.
+
+### Changed
+- Version bumped 2.7.4 → 2.7.5
+
 ## [v2.7.4] — 2026-08-03
 
 ### Fixed
