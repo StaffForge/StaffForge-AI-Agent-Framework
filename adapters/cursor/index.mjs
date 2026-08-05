@@ -22,9 +22,7 @@ ${agent.body}\n`,
 
   // Skills as rules with globs
   for (const skill of skills) {
-    const globsList = skill.frontmatter.globs?.length
-      ? skill.frontmatter.globs.join(', ')
-      : '';
+    const globsList = skill.frontmatter.globs?.length ? skill.frontmatter.globs.join(', ') : '';
     files.push({
       path: `.cursor/rules/${skill.name}.mdc`,
       content: `---

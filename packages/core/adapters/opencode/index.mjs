@@ -1,5 +1,6 @@
 /**
- * OpenCode adapter — generates opencode.json referencing AGENTS.md as instructions.
+ * OpenCode adapter — generates opencode.json + .opencode/skills/<name>.md.
+ * Accepts skills as second parameter.
  *
  * CRITICAL: Must NOT override OpenCode built-in agents. Agents whose
  * lowercased name matches an OpenCode built-in are excluded from the
@@ -8,7 +9,7 @@
 
 const OPENCODE_BUILTINS = new Set(['build', 'plan', 'general', 'explore', 'title', 'summary', 'compaction']);
 
-export default function opencodeAdapter(agents) {
+export default function opencodeAdapter(agents, skills = []) {
   const mapPermission = (tools) => ({
     edit: tools.edit ? 'allow' : 'deny',
     bash: tools.bash ? 'allow' : 'deny',
@@ -23,10 +24,11 @@ export default function opencodeAdapter(agents) {
       description: a.frontmatter.description,
       mode: a.frontmatter.mode,
       permission: mapPermission(a.frontmatter.tools),
+      prompt: a.body,
     };
   }
 
-  const orchestrator = agents.find((a) => a.name === 'orchestrator');
+  const orchestrator = agents.find((a) => a.id === 'orchestrator');
   const defaultAgent = (
     orchestrator?.name ||
     agents.find((a) => a.frontmatter.mode === 'primary')?.name ||
@@ -36,14 +38,35 @@ export default function opencodeAdapter(agents) {
   const opencodeJson = {
     $schema: 'https://opencode.ai/config.json',
     default_agent: defaultAgent,
-    instructions: ['AGENTS.md'],
     agent: agentEntries,
   };
 
-  return [
+  // Add skills config if skills exist
+  if (skills.length > 0) {
+    opencodeJson.skills = {
+      paths: ['.opencode/skills'],
+    };
+  }
+
+  const files = [
     {
       path: 'opencode.json',
       content: JSON.stringify(opencodeJson, null, 2) + '\n',
     },
   ];
+
+  // Write individual skill files
+  for (const skill of skills) {
+    const globsYaml = skill.frontmatter.globs?.length ? `globs: ${JSON.stringify(skill.frontmatter.globs)}\n` : '';
+    files.push({
+      path: `.opencode/skills/${skill.name}.md`,
+      content: `---
+name: ${skill.name}
+description: ${skill.frontmatter.description}
+${globsYaml}---
+${skill.body}\n`,
+    });
+  }
+
+  return files;
 }

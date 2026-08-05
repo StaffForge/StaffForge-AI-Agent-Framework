@@ -5,17 +5,17 @@
  */
 
 export default function aiderAdapter(agents, skills = []) {
-  const rules = agents.map(a => a.body);
+  const rules = agents.map((a) => a.body);
 
   if (skills.length > 0) {
     rules.push('# Skills');
     rules.push('');
-    rules.push(...skills.map(s => s.body));
+    rules.push(...skills.map((s) => s.body));
   }
 
   return [
     {
-      path: ".aider.rules.md",
+      path: '.aider.rules.md',
       content: rules.join('\n\n---\n\n'),
     },
   ];
