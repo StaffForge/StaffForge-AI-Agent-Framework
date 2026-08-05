@@ -3,7 +3,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "2.7.5",
+  "version": "2.7.6",
   "license": "GPL-3.0-only",
   "description": "Multi-provider AI agent framework. Write agents once, deploy anywhere.",
   "type": "module",
@@ -63,7 +63,7 @@
     "js-yaml": "^4.3.0"
   },
   "overrides": {
-    "brace-expansion": "5.0.8"
+    "brace-expansion": "^5.0.9"
   },
   "repository": {
     "type": "git",
