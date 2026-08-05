@@ -29,10 +29,12 @@
     "publish:cli": "cd packages/cli && npm publish",
     "publish:core": "cd packages/core && npm publish",
     "publish:sdk": "cd packages/sdk && npm publish",
-    "publish:plugin-sdk": "cd packages/plugin-sdk && npm publish"
+    "publish:plugin-sdk": "cd packages/plugin-sdk && npm publish",
+    "auto-init": "node scripts/auto-init.mjs"
   },
   "bin": {
-    "staffforge": "./packages/cli/install.mjs"
+    "staffforge": "./packages/cli/install.mjs",
+    "auto-init": "./scripts/auto-init.mjs"
   },
   "files": [
     "install.mjs",

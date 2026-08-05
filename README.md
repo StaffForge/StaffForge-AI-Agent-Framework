@@ -151,6 +151,10 @@ npm run setup          # interactive installer
 > **⚠️ `npm install` vs `npm run install`**
 > Use `npm install` (without `run`) to install dependencies. `npm run install` is **not** a valid command in this project — it fails with `Missing script: "install"`. To run the framework's installer, use `npm run setup` (or `node install.mjs`).
 
+> **OpenCode: setup is one-time + restart required**
+> OpenCode reads `opencode.json` **at startup — there is no hot reload**. After `npm run setup` (or `npm run auto-init`), restart OpenCode so the Orchestrator becomes the default agent. If the Orchestrator is ever missing as default, run `npm run auto-init` (self-healing: only regenerates when the config is stale) and restart.
+
+
 ### Export to other platforms (after cloning)
 
 ```bash
@@ -403,6 +407,7 @@ npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework [options]
 npm install              # Install all dependencies (tools/ included)
 npm run setup            # Interactive installer
 npm run setup:opencode   # Non-interactive: OpenCode + orchestrator
+npm run auto-init        # Self-healing: regenerate opencode.json only if stale (then restart OpenCode)
 npm run export:opencode  # Export to OpenCode
 npm run export:claude    # Export to Claude Code
 npm run export:cursor    # Export to Cursor
