@@ -1,5 +1,18 @@
 # Changelog
 
+## [v2.7.6] — 2026-08-05
+
+### Fixed
+- **`packages/core` adapters no longer stale**: all 6 `packages/core/adapters/*` were outdated copies of the canonical root adapters. `opencode` entries lacked the `prompt` field — agents shipped in the `@staffforge/core` tarball had **no system prompt** — and none supported skills. All 6 are now byte-identical to the root adapters used by the installer and `tools/export.mjs`.
+
+### Added
+- **Adapter drift regression guard**: `tests/unit/core-adapter-drift.test.mjs` runs root vs core adapters with the same agents+skills and asserts identical emitted file paths and contents (26 assertions).
+- **`npm run auto-init`**: self-healing OpenCode config repair. Checks `opencode.json` health (`default_agent: orchestrator`, `mode: primary`) and regenerates via the standard installer **only when stale/missing**; exits silently when healthy. Also exposed as `auto-init` bin (`npx --yes @staffforge/staffforge-ai-agent-framework auto-init`).
+- **Docs**: README/AGENTS.md note that OpenCode reads config at startup — **no hot reload, restart required after setup**; setup is one-time.
+
+### Changed
+- Version bumped 2.7.5 → 2.7.6
+
 ## [v2.7.5] — 2026-08-03
 
 ### Fixed
