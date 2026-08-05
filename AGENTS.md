@@ -118,6 +118,7 @@ Each platform adapter transforms the canonical skill file into its native format
 ```bash
 npm install               # Install all dependencies
 npm run setup             # Interactive installer (any platform)
+npm run auto-init         # Self-healing opencode.json repair (regenerates only if stale; then restart OpenCode)
 npm run validate          # Validate all agents, skills, and models against JSON Schema
 npm test                  # Run all tests (31 suites, 848+ tests)
 npm run export            # Export agents + skills to ALL platforms (--all)
