@@ -52,7 +52,28 @@ const FW_VERSION = (() => {
 // ── Config ──
 const CONFIG_FILE = join(CWD, '.staffforge-install.json');
 const VCS_CONFIG_FILE = join(CWD, '.staffforge-vcs.json');
-const VALID_PLATFORMS = ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+
+// ── Discover platforms from filesystem (single source of truth) ──
+// Reads packages/core/adapters/ to find all available platform adapters.
+// O(n) where n = number of adapter directories.
+function discoverPlatforms() {
+  const adaptersDir = join(resolve(CLI_DIR, '..', '..', 'packages', 'core', 'adapters'));
+  if (!existsSync(adaptersDir)) {
+    // Fallback for npx/edge cases where core may not be at expected path
+    return ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+  }
+  return readdirSync(adaptersDir)
+    .filter((f) => {
+      try {
+        return existsSync(join(adaptersDir, f, 'index.mjs'));
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
+const VALID_PLATFORMS = discoverPlatforms();
 const VALID_VCS = ['git', 'svn', 'hg', 'tfvc', 'perforce', 'custom'];
 const VALID_WORKFLOWS = ['git-flow', 'github-flow', 'gitlab-flow', 'trunk-based', 'custom'];
 
@@ -217,6 +238,16 @@ function parseValue(v) {
   if (s === 'null') return null;
   if (/^\d+$/.test(s)) return parseInt(s, 10);
   if (/^\d+\.\d+$/.test(s)) return parseFloat(s);
+  // JSON arrays and objects (e.g. globs: ["*.sql", "migrations/**"])
+  if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+    try { return JSON.parse(s); } catch {
+      // Fallback: YAML flow sequence with unquoted values
+      // e.g. [opencode.json, opencode.jsonc, .opencode/**]
+      if (s.startsWith('[') && s.endsWith(']')) {
+        return s.slice(1, -1).split(',').map((item) => item.trim()).filter(Boolean);
+      }
+    }
+  }
   return s;
 }
 
@@ -246,146 +277,78 @@ function loadAgents(dir) {
   return agents;
 }
 
-// ── Platform output generators ──
-
-const OPENCODE_BUILTINS = new Set(['build', 'plan', 'general', 'explore', 'title', 'summary', 'compaction']);
-
-function generateOpencode(agents, defaultAgent) {
-  const mapPermission = (tools) => ({
-    edit: tools?.edit ? 'allow' : 'deny',
-    bash: tools?.bash ? 'allow' : 'deny',
-  });
-  const agentEntries = {};
-  for (const a of agents) {
-    const key = a.name.toLowerCase();
-    // MUST skip OpenCode built-in agents to avoid breaking /build, /plan, /compact, etc.
-    if (OPENCODE_BUILTINS.has(key)) continue;
-    agentEntries[key] = {
-      description: a.frontmatter.description || '',
-      mode: a.frontmatter.mode || 'subagent',
-      permission: mapPermission(a.frontmatter.tools),
-      prompt: a.body,
-    };
-  }
-  return [
-    {
-      path: 'opencode.json',
-      content:
-        JSON.stringify(
-          {
-            $schema: 'https://opencode.ai/config.json',
-            default_agent: defaultAgent,
-            agent: agentEntries,
-          },
-          null,
-          2,
-        ) + '\n',
-    },
-  ];
-}
-
-function generateClaude(agents) {
-  const files = [];
-  const orch = agents.find((a) => a.name.toLowerCase() === 'orchestrator');
-  if (orch) files.push({ path: 'CLAUDE.md', content: orch.body + '\n' });
-
-  for (const a of agents) {
-    if (a.name.toLowerCase() === 'orchestrator') continue;
-    const tools = a.frontmatter.tools || {};
-    const toolList = ['read', 'write', 'bash', 'edit']
-      .filter((t) => tools[t])
-      .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
-      .join(', ');
-    const lines = [
-      '---',
-      `name: ${a.name}`,
-      `description: ${a.frontmatter.description || ''}`,
-      toolList ? `tools: ${toolList}` : null,
-      '---',
-    ].filter(Boolean);
-    files.push({
-      path: `.claude/agents/${a.name}.md`,
-      content: lines.join('\n') + '\n\n' + a.body + '\n',
+// ── Load skills from a directory ──
+function loadSkills(dir) {
+  if (!existsSync(dir)) return [];
+  const skills = [];
+  const entries = readdirSync(dir);
+  for (const f of entries.sort()) {
+    if (!f.endsWith('.md')) continue;
+    const fp = join(dir, f);
+    if (!statSync(fp).isFile()) continue;
+    const content = readFileSync(fp, 'utf-8');
+    const parsed = parseFrontmatter(content);
+    if (!parsed) {
+      console.warn(`  ⚠ Skipping skill ${f}: no valid frontmatter`);
+      continue;
+    }
+    const name = parsed.frontmatter.name || f.replace(/\.md$/, '');
+    skills.push({
+      name,
+      filename: f,
+      frontmatter: parsed.frontmatter,
+      body: parsed.body || content,
     });
   }
-  return files;
+  return skills;
 }
 
-function generateCursor(agents) {
-  return agents.map((a) => ({
-    path: `.cursor/rules/${a.name}.mdc`,
-    content: `---
-description: ${a.frontmatter.description || ''}
-globs: 
----
-${a.body}\n`,
-  }));
+// ── Platform adapter loader (delegates to canonical adapters) ──────────
+// Loads the adapter function from packages/core/adapters/<platform>/index.mjs
+// to ensure single source of truth — no inline generator duplication.
+
+async function loadAdapter(platform) {
+  const adapterPath = join(resolve(CLI_DIR, '..', '..', 'packages', 'core', 'adapters', platform, 'index.mjs'));
+  if (!existsSync(adapterPath)) {
+    throw new Error(`Adapter not found: ${adapterPath}`);
+  }
+  const mod = await import(pathToFileURL(adapterPath).href);
+  if (typeof mod.default !== 'function') {
+    throw new Error(`Adapter "${platform}" must export a default function`);
+  }
+  return mod.default;
 }
 
-function generateCopilot(agents) {
-  const files = [];
+// ── Generate platform files via canonical adapter ─────────────────────
+// Handles adapter-specific quirks (e.g. OpenCode default_agent override,
+// Copilot stale-file cleanup) while delegating generation to the adapter.
 
-  // ── 1. copilot-instructions.md — NEUTRAL project context ───────────────
-  // CRITICAL: This file has applyTo: "**" which applies to EVERY Copilot
-  // conversation. If we put "you are the orchestrator" here, it overrides
-  // @ask (default chat), @plan, and ALL built-in agents.
-  // This file MUST remain neutral — just project-level context.
-  files.push({
-    path: '.github/copilot-instructions.md',
-    content: `---\napplyTo: "**"\n---\n\nStaffForge AI Agent Framework — Multi-provider agent system.\nUse @orchestrator for multi-agent pipeline execution.\nTechnology agents (@python, @typescript, @react, etc.) are available via @mention.\n`,
-  });
+async function generatePlatformFiles(platform, agents, skills, defaultAgent) {
+  const adapter = await loadAdapter(platform);
 
-  // ── 2. .github/agents/<name>.agent.md — ALL agents @mention-able ──────
-  // Every agent gets its own .agent.md so it can be @mentioned directly.
-  // Built-in Copilot agents (@ask, @plan, @workspace) remain available
-  // because we do NOT override copilot-instructions.md with agent identity.
-  for (const agent of agents) {
-    const t = agent.frontmatter.tools || {};
-    const allowed = [];
-    if (t.write || t.edit) allowed.push('read', 'edit');
-    if (t.bash) allowed.push('execute');
-    allowed.push('agent');
+  // Clean stale Copilot agent files before regenerating (avoids orphans)
+  if (platform === 'copilot') {
+    // Caller handles directory cleanup via writeFiles with --force
+  }
 
-    const fm = ['---'];
-    fm.push(`name: ${agent.name}`);
-    if (agent.frontmatter.description) fm.push(`description: ${agent.frontmatter.description}`);
-    fm.push(`tools: [${allowed.map((x) => `'${x}'`).join(', ')}]`);
-    fm.push('---');
+  // All adapters accept (agents, skills). OpenCode also accepts defaultAgent
+  // via its second param — but the canonical adapter derives it internally.
+  // We call with (agents, skills) and patch default_agent afterward for OpenCode.
+  const files = adapter(agents, skills);
 
-    files.push({
-      path: `.github/agents/${agent.id}.agent.md`,
-      content: fm.join('\n') + '\n\n' + agent.body + '\n',
-    });
+  // For OpenCode: patch default_agent if user specified --agent
+  if (platform === 'opencode' && defaultAgent) {
+    for (const f of files) {
+      if (f.path === 'opencode.json') {
+        const obj = JSON.parse(f.content);
+        obj.default_agent = defaultAgent;
+        f.content = JSON.stringify(obj, null, 2) + '\n';
+      }
+    }
   }
 
   return files;
 }
-
-function generateAider(agents) {
-  const rules = agents.map((a) => a.body);
-  return [
-    {
-      path: '.aider.rules.md',
-      content: rules.join('\n\n---\n\n'),
-    },
-  ];
-}
-
-function generateGemini(agents) {
-  return agents.map((a) => ({
-    path: `.gemini/${a.name}.md`,
-    content: a.body + '\n',
-  }));
-}
-
-const GENERATORS = {
-  opencode: generateOpencode,
-  'claude-code': generateClaude,
-  cursor: generateCursor,
-  copilot: generateCopilot,
-  aider: generateAider,
-  'gemini-cli': generateGemini,
-};
 
 // ── Write output files ──
 function writeFiles(files, outDir, o = {}) {
@@ -606,6 +569,13 @@ async function main() {
     exit(1);
   }
 
+  // Load skills (optional — directory may not exist)
+  const skillsDir = join(fw, 'skills');
+  const skills = loadSkills(skillsDir);
+  if (skills.length > 0) {
+    console.log(`  Skills:   ${skills.length} files in ${relative(CWD, skillsDir) || skillsDir}`);
+  }
+
   // Determine options
   let platform = o.platform;
   let agent = o.agent;
@@ -645,11 +615,6 @@ async function main() {
   // For --platform all, ALL files go into the same root output dir.
   // For a single platform, files go to outDir.
   for (const pl of platforms) {
-    const gen = GENERATORS[pl];
-    if (!gen) {
-      console.error(`  ✖ Unknown platform: ${pl}`);
-      continue;
-    }
     console.log(`\n→ Exporting for ${pl}...`);
     // Clean stale agent files before regenerating (avoids orphan .agent.md from prev installs)
     if (pl === 'copilot') {
@@ -665,7 +630,13 @@ async function main() {
         }
       }
     }
-    const files = pl === 'opencode' ? gen(agents, agent) : gen(agents);
+    let files;
+    try {
+      files = await generatePlatformFiles(pl, agents, skills, pl === 'opencode' ? agent : null);
+    } catch (err) {
+      console.error(`  ✖ Adapter "${pl}" failed: ${err.message}`);
+      continue;
+    }
     const count = writeFiles(files, outDir, { force: o.force });
     const outRel = outDir === CWD ? '.' : relative(CWD, outDir) || outDir;
     console.log(`  ✓ ${count} file(s) → ${outRel}`);
@@ -707,15 +678,21 @@ async function main() {
   // ── For single platform: copy platform files to CWD ──
   // (so opencode.json, CLAUDE.md etc appear in the project root)
   if (!isAll && outDir !== CWD) {
-    const gen = GENERATORS[platform];
-    const files = platform === 'opencode' ? gen(agents, agent) : gen(agents);
-    for (const f of files) {
-      const src = join(outDir, f.path);
-      const dst = join(CWD, f.path);
-      if (existsSync(src)) {
-        mkdirSync(dirname(dst), { recursive: true });
-        copyFileSync(src, dst);
-        console.log(`  ✓ ${f.path} → .`);
+    let files;
+    try {
+      files = await generatePlatformFiles(platform, agents, skills, platform === 'opencode' ? agent : null);
+    } catch (err) {
+      // Adapter already failed above — skip copy
+    }
+    if (files) {
+      for (const f of files) {
+        const src = join(outDir, f.path);
+        const dst = join(CWD, f.path);
+        if (existsSync(src)) {
+          mkdirSync(dirname(dst), { recursive: true });
+          copyFileSync(src, dst);
+          console.log(`  ✓ ${f.path} → .`);
+        }
       }
     }
   }

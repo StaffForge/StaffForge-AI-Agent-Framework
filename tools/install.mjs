@@ -7,7 +7,26 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-const VALID_PLATFORMS = ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+// ── Discover platforms from filesystem (single source of truth) ──
+// Reads adapters/ directory to find all available platform adapters.
+// O(n) where n = number of adapter directories.
+function discoverPlatforms() {
+  const adaptersDir = join(root, 'adapters');
+  if (!existsSync(adaptersDir)) {
+    return ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+  }
+  return readdirSync(adaptersDir)
+    .filter((f) => {
+      try {
+        return existsSync(join(adaptersDir, f, 'index.mjs'));
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
+const VALID_PLATFORMS = discoverPlatforms();
 
 const rl = createInterface({
   input: process.stdin,
@@ -82,6 +101,10 @@ async function promptDefaultAgent() {
 }
 
 async function main() {
+  // ── Deprecation notice ──
+  console.warn('\n⚠ DEPRECATED: tools/install.mjs is deprecated and will be removed in v3.0.');
+  console.warn('  Use "npm run setup" instead (or "node packages/cli/install.mjs").\n');
+
   const opts = parseArgs();
   let defaultAgent = opts.agent;
 
