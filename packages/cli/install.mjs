@@ -95,6 +95,7 @@ OPTIONS
   --vcs <name>        VCS provider (git, svn, hg, tfvc, perforce, custom)
   --workflow <name>   Workflow preset (git-flow, github-flow, gitlab-flow, trunk-based, custom)
   --yes, -y           Skip interactive prompts, use defaults
+  --check             Validate installed state without modifying (discovery only)
   --help, -h          Show this help
 `);
 }
@@ -131,6 +132,9 @@ function parseArgs() {
       case '--yes':
       case '-y':
         o.yes = true;
+        break;
+      case '--check':
+        o.check = true;
         break;
       default:
         if (!a[i].startsWith('--')) {
@@ -533,6 +537,19 @@ async function main() {
   }
 
   console.log(`\nStaffForge AI Agent Framework — Installer v${FW_VERSION}\n`);
+
+  // ── Discovery check (--check flag) ──
+  if (o.check) {
+    const { discover } = await import(
+      pathToFileURL(join(resolve(CLI_DIR, '..', '..'), 'tools', 'discover-installed.mjs')).href
+    );
+    const result = discover(CWD);
+    console.log(result.message);
+    if (!result.healthy && result.platform) {
+      for (const e of result.platform.errors) console.log(`  - ${e}`);
+    }
+    exit(result.healthy ? 0 : 1);
+  }
 
   // Find framework directory
   let fw = findFwDir();
