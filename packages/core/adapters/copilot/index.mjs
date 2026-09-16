@@ -46,6 +46,7 @@ function buildAgentFrontmatter(agent) {
   lines.push(`name: ${agent.name}`);
   const desc = agent.frontmatter.description || '';
   if (desc) lines.push(`description: ${desc}`);
+  lines.push(`mode: ${agent.frontmatter.mode || 'subagent'}`);
 
   const tools = mapTools(agent.frontmatter);
   if (tools) {

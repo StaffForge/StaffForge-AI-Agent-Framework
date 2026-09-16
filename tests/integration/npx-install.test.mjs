@@ -161,6 +161,7 @@ function runInstall(repoDir, projectDir, args = []) {
     const agentNames = Object.keys(opencode.agent);
     assert(agentNames.length >= 148, `opencode.json has ${agentNames.length} agents`);
     assert(opencode.agent.orchestrator, 'opencode.json has orchestrator agent');
+    assert(opencode.agent.orchestrator.mode === 'primary', 'opencode orchestrator has mode: primary (same level as build/plan)');
     assert(!opencode.agent.build, 'opencode.json MUST NOT have build agent (OpenCode built-in)');
     assert(!opencode.agent.plan, 'opencode.json MUST NOT have plan agent (OpenCode built-in)');
     assert(!opencode.agent.compaction, 'opencode.json MUST NOT have compaction agent (OpenCode built-in)');

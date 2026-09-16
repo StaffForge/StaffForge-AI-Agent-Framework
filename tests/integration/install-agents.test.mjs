@@ -51,6 +51,7 @@ function runInstallInProject(platform) {
   const orchestrator = json.agent.orchestrator;
   assert(orchestrator && orchestrator.prompt, 'opencode orchestrator has prompt');
   assert(orchestrator.prompt.length > 100, 'opencode Orchestrator prompt is non-trivial');
+  assert(orchestrator.mode === 'primary', 'opencode orchestrator has mode: primary (same level as build/plan)');
 
   // No broken instructions reference to a missing AGENTS.md
   assert(!json.instructions || !json.instructions.includes('AGENTS.md'), 'opencode no broken AGENTS.md reference');
@@ -87,6 +88,13 @@ function runInstallInProject(platform) {
     'claude-code a11y.md contains rules/guardrails',
   );
 
+  // CLAUDE.md must have orchestrator as primary agent
+  const claudeMdPath = join(project, 'CLAUDE.md');
+  if (existsSync(claudeMdPath)) {
+    const claudeMd = readFileSync(claudeMdPath, 'utf-8');
+    assert(claudeMd.includes('mode: primary'), 'claude-code CLAUDE.md has mode: primary (orchestrator is default)');
+  }
+
   // Must NOT dump agents into .claude/rules/ (that's for always-on rules)
   const rulesDir = join(project, '.claude', 'rules');
   if (existsSync(rulesDir)) {
@@ -113,6 +121,9 @@ function runInstallInProject(platform) {
       a11y.includes('Mandatory Rules') || a11y.includes('Operational Guardrails'),
       'cursor A11y.mdc contains rules/guardrails',
     );
+    // Orchestrator must be primary in Cursor
+    const orchMdc = readFileSync(join(rulesDir, 'Orchestrator.mdc'), 'utf-8');
+    assert(orchMdc.includes('mode: primary'), 'cursor Orchestrator.mdc has mode: primary');
   }
   rmSync(project, { recursive: true, force: true });
 }
@@ -163,6 +174,7 @@ function runInstallInProject(platform) {
     assert(orchFile.startsWith('---'), 'orchestrator.agent.md starts with frontmatter');
     assert(orchFile.includes('name: Orchestrator'), 'orchestrator.agent.md frontmatter has name');
     assert(orchFile.includes('description: '), 'orchestrator.agent.md frontmatter has description');
+    assert(orchFile.includes('mode: primary'), 'orchestrator.agent.md has mode: primary (same level as @ask/@plan)');
     assert(orchFile.includes('## 1. AGENT ROLE'), 'orchestrator.agent.md contains orchestrator body');
     assert(
       orchFile.includes('### 🔴 Mandatory VCS Rules & Delegation Protocols'),

@@ -39,13 +39,13 @@ export class AdapterRegistry {
     return mod.default;
   }
 
-  async export(agents, platform, outDir = null) {
+  async export(agents, platform, outDir = null, skills = []) {
     const adapter = await this.getAdapter(platform);
     const resolvedOut = outDir || join(this._adaptersDir, platform, 'output');
 
     mkdirSync(resolvedOut, { recursive: true });
 
-    const files = adapter(agents);
+    const files = adapter(agents, skills);
     for (const { path, content } of files) {
       const fullPath = join(resolvedOut, path);
       mkdirSync(dirname(fullPath), { recursive: true });
@@ -55,11 +55,11 @@ export class AdapterRegistry {
     return { platform, outDir: resolvedOut, fileCount: files.length };
   }
 
-  async exportToAll(agents) {
+  async exportToAll(agents, skills = []) {
     const platforms = this.listAdapters();
     const results = [];
     for (const platform of platforms) {
-      const result = await this.export(agents, platform);
+      const result = await this.export(agents, platform, null, skills);
       results.push(result);
     }
     return results;
