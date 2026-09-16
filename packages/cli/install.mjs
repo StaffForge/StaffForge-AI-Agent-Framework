@@ -3,9 +3,8 @@
 /**
  * StaffForge AI Agent Framework — universal installer
  *
- * Self-contained, zero external dependencies. Works via:
- *   npx github:StaffForge/StaffForge-AI-Agent-Framework
- *   node packages/cli/install.mjs
+ * Resolves resources via @staffforge/core (npm) or monorepo paths.
+ * No hardcoded monorepo paths in runtime — all resolved via resolve-resources.mjs.
  *
  * Options:
  *   --platform <name>   opencode | claude-code | cursor | copilot | aider | gemini-cli | all
@@ -34,32 +33,29 @@ import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
 import { env, argv, exit, cwd, stdout } from 'node:process';
+import {
+  resolveCoreDir,
+  getAdapterPath,
+  getAdaptersDir,
+  getAgentsDir,
+  getSkillsDir,
+  getFrameworkVersion,
+} from './resolve-resources.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = resolve(__dirname);
 const CWD = cwd();
 
-// Framework version — read from the root package.json so the installer banner
-// reflects the deployed release instead of a stale hardcoded literal.
-const FW_VERSION = (() => {
-  try {
-    return JSON.parse(readFileSync(join(CLI_DIR, '..', '..', 'package.json'), 'utf8')).version;
-  } catch {
-    return 'unknown';
-  }
-})();
-
 // ── Config ──
 const CONFIG_FILE = join(CWD, '.staffforge-install.json');
 const VCS_CONFIG_FILE = join(CWD, '.staffforge-vcs.json');
 
-// ── Discover platforms from filesystem (single source of truth) ──
-// Reads packages/core/adapters/ to find all available platform adapters.
+// ── Discover platforms from @staffforge/core (single source of truth) ──
 // O(n) where n = number of adapter directories.
-function discoverPlatforms() {
-  const adaptersDir = join(resolve(CLI_DIR, '..', '..', 'packages', 'core', 'adapters'));
-  if (!existsSync(adaptersDir)) {
-    // Fallback for npx/edge cases where core may not be at expected path
+async function discoverPlatforms() {
+  const adaptersDir = await getAdaptersDir();
+  if (!adaptersDir || !existsSync(adaptersDir)) {
+    // Fallback for edge cases where core may not be resolvable
     return ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
   }
   return readdirSync(adaptersDir)
@@ -73,7 +69,6 @@ function discoverPlatforms() {
     .sort();
 }
 
-const VALID_PLATFORMS = discoverPlatforms();
 const VALID_VCS = ['git', 'svn', 'hg', 'tfvc', 'perforce', 'custom'];
 const VALID_WORKFLOWS = ['git-flow', 'github-flow', 'gitlab-flow', 'trunk-based', 'custom'];
 
@@ -155,13 +150,9 @@ const rl = createInterface({ input: process.stdin, output: stdout });
 const ask = (q) => new Promise((r) => rl.question(q, r));
 
 // ── Find framework directory (where agents/ lives) ──
-function findFwDir() {
-  // Try: same dir as CLI script, parent, grandparent, CWD
-  const candidates = [CLI_DIR, resolve(CLI_DIR, '..'), resolve(CLI_DIR, '..', '..'), CWD];
-  for (const d of candidates) {
-    if (existsSync(join(d, 'agents')) && existsSync(join(d, 'agents', 'orchestrator.md'))) return d;
-  }
-  return null;
+// Delegates to resolve-resources.mjs which tries npm > monorepo > framework root.
+async function findFwDir() {
+  return await resolveCoreDir(CWD);
 }
 
 // ── Simple YAML frontmatter parser (no deps) ──
@@ -307,14 +298,14 @@ function loadSkills(dir) {
   return skills;
 }
 
-// ── Platform adapter loader (delegates to canonical adapters) ──────────
-// Loads the adapter function from packages/core/adapters/<platform>/index.mjs
+// ── Platform adapter loader (delegates to @staffforge/core) ────────────
+// Loads the adapter function from @staffforge/core/adapters/<platform>/index.mjs
 // to ensure single source of truth — no inline generator duplication.
 
 async function loadAdapter(platform) {
-  const adapterPath = join(resolve(CLI_DIR, '..', '..', 'packages', 'core', 'adapters', platform, 'index.mjs'));
-  if (!existsSync(adapterPath)) {
-    throw new Error(`Adapter not found: ${adapterPath}`);
+  const adapterPath = await getAdapterPath(platform);
+  if (!adapterPath) {
+    throw new Error(`Adapter not found for platform "${platform}". Ensure @staffforge/core is installed.`);
   }
   const mod = await import(pathToFileURL(adapterPath).href);
   if (typeof mod.default !== 'function') {
@@ -460,13 +451,13 @@ async function confirmReinstall(prev) {
 }
 
 // ── Interactive prompts ──
-async function askPlatform() {
+async function askPlatform(platforms) {
   console.log('\nPlatform:');
   console.log('  1) opencode    2) claude-code  3) cursor  4) copilot  5) aider  6) gemini-cli  7) all');
   const c = (await ask('\n? [1]: ')).trim();
   const m = { 2: 'claude-code', 3: 'cursor', 4: 'copilot', 5: 'aider', 6: 'gemini-cli', 7: 'all' };
   const p = m[c] || c || 'opencode';
-  return VALID_PLATFORMS.includes(p) || p === 'all' ? p : 'opencode';
+  return platforms.includes(p) || p === 'all' ? p : 'opencode';
 }
 
 async function askAgent() {
@@ -536,39 +527,52 @@ async function main() {
     return;
   }
 
-  console.log(`\nStaffForge AI Agent Framework — Installer v${FW_VERSION}\n`);
+  console.log(`\nStaffForge AI Agent Framework — Installer v${await getFrameworkVersion()}\n`);
 
   // ── Discovery check (--check flag) ──
   if (o.check) {
-    const { discover } = await import(
-      pathToFileURL(join(resolve(CLI_DIR, '..', '..'), 'tools', 'discover-installed.mjs')).href
-    );
-    const result = discover(CWD);
-    console.log(result.message);
-    if (!result.healthy && result.platform) {
-      for (const e of result.platform.errors) console.log(`  - ${e}`);
-    }
-    exit(result.healthy ? 0 : 1);
-  }
-
-  // Find framework directory
-  let fw = findFwDir();
-  if (!fw) {
-    // When running via npx, the script is executed from the temp install dir
-    // Try to find agents/ relative to the CLI script
-    const tryDirs = [CLI_DIR, resolve(CLI_DIR, '..'), resolve(CLI_DIR, '..', '..')];
-    for (const d of tryDirs) {
-      if (existsSync(join(d, 'agents', 'orchestrator.md'))) {
-        fw = d;
+    const coreDir = await resolveCoreDir(CWD);
+    // tools/ lives at the project root. Walk up from coreDir to find it.
+    let toolsDir = null;
+    const searchRoots = coreDir
+      ? [coreDir, join(coreDir, '..'), join(coreDir, '..', '..')]
+      : [join(CLI_DIR, '..', '..')];
+    for (const candidate of searchRoots) {
+      if (existsSync(join(candidate, 'tools', 'discover-installed.mjs'))) {
+        toolsDir = join(candidate, 'tools');
         break;
       }
     }
+    if (!toolsDir) {
+      console.error('✖ Discovery module not found: cannot locate tools/discover-installed.mjs');
+      exit(1);
+    }
+    try {
+      const { discover } = await import(
+        pathToFileURL(join(toolsDir, 'discover-installed.mjs')).href
+      );
+      const result = discover(CWD);
+      console.log(result.message);
+      if (!result.healthy && result.platform) {
+        for (const e of result.platform.errors) console.log(`  - ${e}`);
+      }
+      exit(result.healthy ? 0 : 1);
+    } catch (err) {
+      console.error(`✖ Discovery module not found: ${err.message}`);
+      exit(1);
+    }
   }
+
+  // Find framework directory
+  let fw = await findFwDir();
   if (!fw) {
     console.error('✖ Cannot find StaffForge agents directory.');
-    console.error('  Run this command from within the StaffForge framework directory.');
+    console.error('  Ensure @staffforge/core is installed or run from the framework directory.');
     exit(1);
   }
+
+  // Discover available platforms from @staffforge/core
+  const VALID_PLATFORMS = await discoverPlatforms();
 
   const agentsDir = join(fw, 'agents');
   const agentCount = readdirSync(agentsDir).filter((f) => f.endsWith('.md')).length;
@@ -617,7 +621,7 @@ async function main() {
       }
     }
 
-    if (!platform) platform = await askPlatform();
+    if (!platform) platform = await askPlatform(VALID_PLATFORMS);
     if (!agent) agent = await askAgent();
     if (!outDir) outDir = await askLocation();
     if (!vcs) vcs = await askVcs();
@@ -740,8 +744,21 @@ async function main() {
   // We pass THIS installer's readline (`rl`/`ask`) to avoid opening a second
   // reader on process.stdin (which caused duplicate character echo on input).
   try {
+    const coreDir = await resolveCoreDir(CWD);
+    // Resolve tools/ from project root (same logic as --check above).
+    let toolsDir = null;
+    const searchRoots = coreDir
+      ? [coreDir, join(coreDir, '..'), join(coreDir, '..', '..')]
+      : [join(CLI_DIR, '..', '..')];
+    for (const candidate of searchRoots) {
+      if (existsSync(join(candidate, 'tools', 'init-agents-config.mjs'))) {
+        toolsDir = join(candidate, 'tools');
+        break;
+      }
+    }
+    if (!toolsDir) throw new Error('tools/init-agents-config.mjs not found');
     const { generateAgentsConfig } = await import(
-      pathToFileURL(join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')).href
+      pathToFileURL(join(toolsDir, 'init-agents-config.mjs')).href
     );
     await generateAgentsConfig({ outDir: CWD, yes: o.yes, rl, ask });
   } catch (err) {
