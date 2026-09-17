@@ -235,11 +235,17 @@ function parseValue(v) {
   if (/^\d+\.\d+$/.test(s)) return parseFloat(s);
   // JSON arrays and objects (e.g. globs: ["*.sql", "migrations/**"])
   if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
-    try { return JSON.parse(s); } catch {
+    try {
+      return JSON.parse(s);
+    } catch {
       // Fallback: YAML flow sequence with unquoted values
       // e.g. [opencode.json, opencode.jsonc, .opencode/**]
       if (s.startsWith('[') && s.endsWith(']')) {
-        return s.slice(1, -1).split(',').map((item) => item.trim()).filter(Boolean);
+        return s
+          .slice(1, -1)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
       }
     }
   }
@@ -548,9 +554,7 @@ async function main() {
       exit(1);
     }
     try {
-      const { discover } = await import(
-        pathToFileURL(join(toolsDir, 'discover-installed.mjs')).href
-      );
+      const { discover } = await import(pathToFileURL(join(toolsDir, 'discover-installed.mjs')).href);
       const result = discover(CWD);
       console.log(result.message);
       if (!result.healthy && result.platform) {
@@ -757,9 +761,7 @@ async function main() {
       }
     }
     if (!toolsDir) throw new Error('tools/init-agents-config.mjs not found');
-    const { generateAgentsConfig } = await import(
-      pathToFileURL(join(toolsDir, 'init-agents-config.mjs')).href
-    );
+    const { generateAgentsConfig } = await import(pathToFileURL(join(toolsDir, 'init-agents-config.mjs')).href);
     await generateAgentsConfig({ outDir: CWD, yes: o.yes, rl, ask });
   } catch (err) {
     console.warn(`\n  ⚠ AGENTS config generation skipped: ${err.message}`);

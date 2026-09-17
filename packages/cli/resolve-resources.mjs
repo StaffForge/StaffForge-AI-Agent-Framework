@@ -77,10 +77,7 @@ function resolveFromFrameworkRoot() {
     resolve(__dirname, '..', '..', '..'),
   ];
   for (const dir of candidates) {
-    if (
-      existsSync(join(dir, 'agents', 'orchestrator.md')) &&
-      existsSync(join(dir, 'adapters'))
-    ) {
+    if (existsSync(join(dir, 'agents', 'orchestrator.md')) && existsSync(join(dir, 'adapters'))) {
       return dir;
     }
   }
