@@ -10,9 +10,16 @@ export default function claudeCodeAdapter(agents, skills = []) {
 
   const orchestratorAgent = agents.find((a) => a.name.toLowerCase() === 'orchestrator');
   if (orchestratorAgent) {
+    const orchFrontmatter = [
+      '---',
+      `name: ${orchestratorAgent.name}`,
+      `description: ${orchestratorAgent.frontmatter.description || 'Primary agent — coordinates all work, delegates VCS and shell, routes tasks.'}`,
+      `mode: primary`,
+      '---',
+    ].join('\n');
     files.push({
       path: 'CLAUDE.md',
-      content: orchestratorAgent.body + '\n',
+      content: `${orchFrontmatter}\n\n${orchestratorAgent.body}\n`,
     });
   }
 
@@ -26,6 +33,7 @@ export default function claudeCodeAdapter(agents, skills = []) {
       '---',
       `name: ${agent.name}`,
       `description: ${agent.frontmatter.description}`,
+      `mode: ${agent.frontmatter.mode || 'subagent'}`,
       toolList ? `tools: ${toolList}` : null,
       '---',
     ]

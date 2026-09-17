@@ -10,10 +10,12 @@ export default function cursorAdapter(agents, skills = []) {
 
   // Agents as rules
   for (const agent of agents) {
+    const mode = agent.frontmatter.mode || 'subagent';
     files.push({
       path: `.cursor/rules/${agent.name}.mdc`,
       content: `---
 description: ${agent.frontmatter.description}
+mode: ${mode}
 globs: 
 ---
 ${agent.body}\n`,

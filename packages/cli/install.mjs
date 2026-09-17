@@ -3,13 +3,12 @@
 /**
  * StaffForge AI Agent Framework — universal installer
  *
- * Self-contained, zero external dependencies. Works via:
- *   npx github:StaffForge/StaffForge-AI-Agent-Framework
- *   node packages/cli/install.mjs
+ * Resolves resources via @staffforge/core (npm) or monorepo paths.
+ * No hardcoded monorepo paths in runtime — all resolved via resolve-resources.mjs.
  *
  * Options:
  *   --platform <name>   opencode | claude-code | cursor | copilot | aider | gemini-cli | all
- *   --agent <name>      orchestrator | build | plan
+ *   --agent <name>      orchestrator (default)
  *   --out <dir>         output directory (default: CWD)
  *   --vcs <name>        git | svn | hg | tfvc | perforce | custom (default: git)
  *   --workflow <name>   git-flow | github-flow | gitlab-flow | trunk-based | custom (default: git-flow)
@@ -34,25 +33,42 @@ import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
 import { env, argv, exit, cwd, stdout } from 'node:process';
+import {
+  resolveCoreDir,
+  getAdapterPath,
+  getAdaptersDir,
+  getAgentsDir,
+  getSkillsDir,
+  getFrameworkVersion,
+} from './resolve-resources.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = resolve(__dirname);
 const CWD = cwd();
 
-// Framework version — read from the root package.json so the installer banner
-// reflects the deployed release instead of a stale hardcoded literal.
-const FW_VERSION = (() => {
-  try {
-    return JSON.parse(readFileSync(join(CLI_DIR, '..', '..', 'package.json'), 'utf8')).version;
-  } catch {
-    return 'unknown';
-  }
-})();
-
 // ── Config ──
 const CONFIG_FILE = join(CWD, '.staffforge-install.json');
 const VCS_CONFIG_FILE = join(CWD, '.staffforge-vcs.json');
-const VALID_PLATFORMS = ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+
+// ── Discover platforms from @staffforge/core (single source of truth) ──
+// O(n) where n = number of adapter directories.
+async function discoverPlatforms() {
+  const adaptersDir = await getAdaptersDir();
+  if (!adaptersDir || !existsSync(adaptersDir)) {
+    // Fallback for edge cases where core may not be resolvable
+    return ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
+  }
+  return readdirSync(adaptersDir)
+    .filter((f) => {
+      try {
+        return existsSync(join(adaptersDir, f, 'index.mjs'));
+      } catch {
+        return false;
+      }
+    })
+    .sort();
+}
+
 const VALID_VCS = ['git', 'svn', 'hg', 'tfvc', 'perforce', 'custom'];
 const VALID_WORKFLOWS = ['git-flow', 'github-flow', 'gitlab-flow', 'trunk-based', 'custom'];
 
@@ -61,19 +77,20 @@ function help() {
   console.log(`StaffForge AI Agent Framework — Installer
 
 USAGE
-  npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework -- [options]
-  npx github:StaffForge/StaffForge-AI-Agent-Framework [options]
+  npx @staffforge/staffforge-ai-agent-framework [options]
+  npm exec --yes -- @staffforge/staffforge-ai-agent-framework -- [options]
   node packages/cli/install.mjs [options]
 
 OPTIONS
   --platform <name>   Target platform
                       (opencode, claude-code, cursor, copilot, aider, gemini-cli, all)
-  --agent <name>      Default agent (orchestrator only; build/plan are @subagents)
+  --agent <name>      Default agent (orchestrator, plan)
   --out <dir>         Output directory (default: current directory)
   --force, -f        Overwrite existing generated files (backs up <file>.bak)
   --vcs <name>        VCS provider (git, svn, hg, tfvc, perforce, custom)
   --workflow <name>   Workflow preset (git-flow, github-flow, gitlab-flow, trunk-based, custom)
   --yes, -y           Skip interactive prompts, use defaults
+  --check             Validate installed state without modifying (discovery only)
   --help, -h          Show this help
 `);
 }
@@ -111,6 +128,9 @@ function parseArgs() {
       case '-y':
         o.yes = true;
         break;
+      case '--check':
+        o.check = true;
+        break;
       default:
         if (!a[i].startsWith('--')) {
           o.command = a[i];
@@ -130,13 +150,9 @@ const rl = createInterface({ input: process.stdin, output: stdout });
 const ask = (q) => new Promise((r) => rl.question(q, r));
 
 // ── Find framework directory (where agents/ lives) ──
-function findFwDir() {
-  // Try: same dir as CLI script, parent, grandparent, CWD
-  const candidates = [CLI_DIR, resolve(CLI_DIR, '..'), resolve(CLI_DIR, '..', '..'), CWD];
-  for (const d of candidates) {
-    if (existsSync(join(d, 'agents')) && existsSync(join(d, 'agents', 'orchestrator.md'))) return d;
-  }
-  return null;
+// Delegates to resolve-resources.mjs which tries npm > monorepo > framework root.
+async function findFwDir() {
+  return await resolveCoreDir(CWD);
 }
 
 // ── Simple YAML frontmatter parser (no deps) ──
@@ -217,6 +233,22 @@ function parseValue(v) {
   if (s === 'null') return null;
   if (/^\d+$/.test(s)) return parseInt(s, 10);
   if (/^\d+\.\d+$/.test(s)) return parseFloat(s);
+  // JSON arrays and objects (e.g. globs: ["*.sql", "migrations/**"])
+  if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('{') && s.endsWith('}'))) {
+    try {
+      return JSON.parse(s);
+    } catch {
+      // Fallback: YAML flow sequence with unquoted values
+      // e.g. [opencode.json, opencode.jsonc, .opencode/**]
+      if (s.startsWith('[') && s.endsWith(']')) {
+        return s
+          .slice(1, -1)
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+    }
+  }
   return s;
 }
 
@@ -246,146 +278,78 @@ function loadAgents(dir) {
   return agents;
 }
 
-// ── Platform output generators ──
-
-const OPENCODE_BUILTINS = new Set(['build', 'plan', 'general', 'explore', 'title', 'summary', 'compaction']);
-
-function generateOpencode(agents, defaultAgent) {
-  const mapPermission = (tools) => ({
-    edit: tools?.edit ? 'allow' : 'deny',
-    bash: tools?.bash ? 'allow' : 'deny',
-  });
-  const agentEntries = {};
-  for (const a of agents) {
-    const key = a.name.toLowerCase();
-    // MUST skip OpenCode built-in agents to avoid breaking /build, /plan, /compact, etc.
-    if (OPENCODE_BUILTINS.has(key)) continue;
-    agentEntries[key] = {
-      description: a.frontmatter.description || '',
-      mode: a.frontmatter.mode || 'subagent',
-      permission: mapPermission(a.frontmatter.tools),
-      prompt: a.body,
-    };
-  }
-  return [
-    {
-      path: 'opencode.json',
-      content:
-        JSON.stringify(
-          {
-            $schema: 'https://opencode.ai/config.json',
-            default_agent: defaultAgent,
-            agent: agentEntries,
-          },
-          null,
-          2,
-        ) + '\n',
-    },
-  ];
-}
-
-function generateClaude(agents) {
-  const files = [];
-  const orch = agents.find((a) => a.name.toLowerCase() === 'orchestrator');
-  if (orch) files.push({ path: 'CLAUDE.md', content: orch.body + '\n' });
-
-  for (const a of agents) {
-    if (a.name.toLowerCase() === 'orchestrator') continue;
-    const tools = a.frontmatter.tools || {};
-    const toolList = ['read', 'write', 'bash', 'edit']
-      .filter((t) => tools[t])
-      .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
-      .join(', ');
-    const lines = [
-      '---',
-      `name: ${a.name}`,
-      `description: ${a.frontmatter.description || ''}`,
-      toolList ? `tools: ${toolList}` : null,
-      '---',
-    ].filter(Boolean);
-    files.push({
-      path: `.claude/agents/${a.name}.md`,
-      content: lines.join('\n') + '\n\n' + a.body + '\n',
+// ── Load skills from a directory ──
+function loadSkills(dir) {
+  if (!existsSync(dir)) return [];
+  const skills = [];
+  const entries = readdirSync(dir);
+  for (const f of entries.sort()) {
+    if (!f.endsWith('.md')) continue;
+    const fp = join(dir, f);
+    if (!statSync(fp).isFile()) continue;
+    const content = readFileSync(fp, 'utf-8');
+    const parsed = parseFrontmatter(content);
+    if (!parsed) {
+      console.warn(`  ⚠ Skipping skill ${f}: no valid frontmatter`);
+      continue;
+    }
+    const name = parsed.frontmatter.name || f.replace(/\.md$/, '');
+    skills.push({
+      name,
+      filename: f,
+      frontmatter: parsed.frontmatter,
+      body: parsed.body || content,
     });
   }
-  return files;
+  return skills;
 }
 
-function generateCursor(agents) {
-  return agents.map((a) => ({
-    path: `.cursor/rules/${a.name}.mdc`,
-    content: `---
-description: ${a.frontmatter.description || ''}
-globs: 
----
-${a.body}\n`,
-  }));
+// ── Platform adapter loader (delegates to @staffforge/core) ────────────
+// Loads the adapter function from @staffforge/core/adapters/<platform>/index.mjs
+// to ensure single source of truth — no inline generator duplication.
+
+async function loadAdapter(platform) {
+  const adapterPath = await getAdapterPath(platform);
+  if (!adapterPath) {
+    throw new Error(`Adapter not found for platform "${platform}". Ensure @staffforge/core is installed.`);
+  }
+  const mod = await import(pathToFileURL(adapterPath).href);
+  if (typeof mod.default !== 'function') {
+    throw new Error(`Adapter "${platform}" must export a default function`);
+  }
+  return mod.default;
 }
 
-function generateCopilot(agents) {
-  const files = [];
+// ── Generate platform files via canonical adapter ─────────────────────
+// Handles adapter-specific quirks (e.g. OpenCode default_agent override,
+// Copilot stale-file cleanup) while delegating generation to the adapter.
 
-  // ── 1. copilot-instructions.md — NEUTRAL project context ───────────────
-  // CRITICAL: This file has applyTo: "**" which applies to EVERY Copilot
-  // conversation. If we put "you are the orchestrator" here, it overrides
-  // @ask (default chat), @plan, and ALL built-in agents.
-  // This file MUST remain neutral — just project-level context.
-  files.push({
-    path: '.github/copilot-instructions.md',
-    content: `---\napplyTo: "**"\n---\n\nStaffForge AI Agent Framework — Multi-provider agent system.\nUse @orchestrator for multi-agent pipeline execution.\nTechnology agents (@python, @typescript, @react, etc.) are available via @mention.\n`,
-  });
+async function generatePlatformFiles(platform, agents, skills, defaultAgent) {
+  const adapter = await loadAdapter(platform);
 
-  // ── 2. .github/agents/<name>.agent.md — ALL agents @mention-able ──────
-  // Every agent gets its own .agent.md so it can be @mentioned directly.
-  // Built-in Copilot agents (@ask, @plan, @workspace) remain available
-  // because we do NOT override copilot-instructions.md with agent identity.
-  for (const agent of agents) {
-    const t = agent.frontmatter.tools || {};
-    const allowed = [];
-    if (t.write || t.edit) allowed.push('read', 'edit');
-    if (t.bash) allowed.push('execute');
-    allowed.push('agent');
+  // Clean stale Copilot agent files before regenerating (avoids orphans)
+  if (platform === 'copilot') {
+    // Caller handles directory cleanup via writeFiles with --force
+  }
 
-    const fm = ['---'];
-    fm.push(`name: ${agent.name}`);
-    if (agent.frontmatter.description) fm.push(`description: ${agent.frontmatter.description}`);
-    fm.push(`tools: [${allowed.map((x) => `'${x}'`).join(', ')}]`);
-    fm.push('---');
+  // All adapters accept (agents, skills). OpenCode also accepts defaultAgent
+  // via its second param — but the canonical adapter derives it internally.
+  // We call with (agents, skills) and patch default_agent afterward for OpenCode.
+  const files = adapter(agents, skills);
 
-    files.push({
-      path: `.github/agents/${agent.id}.agent.md`,
-      content: fm.join('\n') + '\n\n' + agent.body + '\n',
-    });
+  // For OpenCode: patch default_agent if user specified --agent
+  if (platform === 'opencode' && defaultAgent) {
+    for (const f of files) {
+      if (f.path === 'opencode.json') {
+        const obj = JSON.parse(f.content);
+        obj.default_agent = defaultAgent;
+        f.content = JSON.stringify(obj, null, 2) + '\n';
+      }
+    }
   }
 
   return files;
 }
-
-function generateAider(agents) {
-  const rules = agents.map((a) => a.body);
-  return [
-    {
-      path: '.aider.rules.md',
-      content: rules.join('\n\n---\n\n'),
-    },
-  ];
-}
-
-function generateGemini(agents) {
-  return agents.map((a) => ({
-    path: `.gemini/${a.name}.md`,
-    content: a.body + '\n',
-  }));
-}
-
-const GENERATORS = {
-  opencode: generateOpencode,
-  'claude-code': generateClaude,
-  cursor: generateCursor,
-  copilot: generateCopilot,
-  aider: generateAider,
-  'gemini-cli': generateGemini,
-};
 
 // ── Write output files ──
 function writeFiles(files, outDir, o = {}) {
@@ -493,13 +457,13 @@ async function confirmReinstall(prev) {
 }
 
 // ── Interactive prompts ──
-async function askPlatform() {
+async function askPlatform(platforms) {
   console.log('\nPlatform:');
   console.log('  1) opencode    2) claude-code  3) cursor  4) copilot  5) aider  6) gemini-cli  7) all');
   const c = (await ask('\n? [1]: ')).trim();
   const m = { 2: 'claude-code', 3: 'cursor', 4: 'copilot', 5: 'aider', 6: 'gemini-cli', 7: 'all' };
   const p = m[c] || c || 'opencode';
-  return VALID_PLATFORMS.includes(p) || p === 'all' ? p : 'opencode';
+  return platforms.includes(p) || p === 'all' ? p : 'opencode';
 }
 
 async function askAgent() {
@@ -569,26 +533,50 @@ async function main() {
     return;
   }
 
-  console.log(`\nStaffForge AI Agent Framework — Installer v${FW_VERSION}\n`);
+  console.log(`\nStaffForge AI Agent Framework — Installer v${await getFrameworkVersion()}\n`);
 
-  // Find framework directory
-  let fw = findFwDir();
-  if (!fw) {
-    // When running via npx, the script is executed from the temp install dir
-    // Try to find agents/ relative to the CLI script
-    const tryDirs = [CLI_DIR, resolve(CLI_DIR, '..'), resolve(CLI_DIR, '..', '..')];
-    for (const d of tryDirs) {
-      if (existsSync(join(d, 'agents', 'orchestrator.md'))) {
-        fw = d;
+  // ── Discovery check (--check flag) ──
+  if (o.check) {
+    const coreDir = await resolveCoreDir(CWD);
+    // tools/ lives at the project root. Walk up from coreDir to find it.
+    let toolsDir = null;
+    const searchRoots = coreDir
+      ? [coreDir, join(coreDir, '..'), join(coreDir, '..', '..')]
+      : [join(CLI_DIR, '..', '..')];
+    for (const candidate of searchRoots) {
+      if (existsSync(join(candidate, 'tools', 'discover-installed.mjs'))) {
+        toolsDir = join(candidate, 'tools');
         break;
       }
     }
+    if (!toolsDir) {
+      console.error('✖ Discovery module not found: cannot locate tools/discover-installed.mjs');
+      exit(1);
+    }
+    try {
+      const { discover } = await import(pathToFileURL(join(toolsDir, 'discover-installed.mjs')).href);
+      const result = discover(CWD);
+      console.log(result.message);
+      if (!result.healthy && result.platform) {
+        for (const e of result.platform.errors) console.log(`  - ${e}`);
+      }
+      exit(result.healthy ? 0 : 1);
+    } catch (err) {
+      console.error(`✖ Discovery module not found: ${err.message}`);
+      exit(1);
+    }
   }
+
+  // Find framework directory
+  let fw = await findFwDir();
   if (!fw) {
     console.error('✖ Cannot find StaffForge agents directory.');
-    console.error('  Run this command from within the StaffForge framework directory.');
+    console.error('  Ensure @staffforge/core is installed or run from the framework directory.');
     exit(1);
   }
+
+  // Discover available platforms from @staffforge/core
+  const VALID_PLATFORMS = await discoverPlatforms();
 
   const agentsDir = join(fw, 'agents');
   const agentCount = readdirSync(agentsDir).filter((f) => f.endsWith('.md')).length;
@@ -604,6 +592,13 @@ async function main() {
   if (agents.length === 0) {
     console.error(`✖ No valid agent files found in ${agentsDir}`);
     exit(1);
+  }
+
+  // Load skills (optional — directory may not exist)
+  const skillsDir = join(fw, 'skills');
+  const skills = loadSkills(skillsDir);
+  if (skills.length > 0) {
+    console.log(`  Skills:   ${skills.length} files in ${relative(CWD, skillsDir) || skillsDir}`);
   }
 
   // Determine options
@@ -630,7 +625,7 @@ async function main() {
       }
     }
 
-    if (!platform) platform = await askPlatform();
+    if (!platform) platform = await askPlatform(VALID_PLATFORMS);
     if (!agent) agent = await askAgent();
     if (!outDir) outDir = await askLocation();
     if (!vcs) vcs = await askVcs();
@@ -645,11 +640,6 @@ async function main() {
   // For --platform all, ALL files go into the same root output dir.
   // For a single platform, files go to outDir.
   for (const pl of platforms) {
-    const gen = GENERATORS[pl];
-    if (!gen) {
-      console.error(`  ✖ Unknown platform: ${pl}`);
-      continue;
-    }
     console.log(`\n→ Exporting for ${pl}...`);
     // Clean stale agent files before regenerating (avoids orphan .agent.md from prev installs)
     if (pl === 'copilot') {
@@ -665,7 +655,13 @@ async function main() {
         }
       }
     }
-    const files = pl === 'opencode' ? gen(agents, agent) : gen(agents);
+    let files;
+    try {
+      files = await generatePlatformFiles(pl, agents, skills, pl === 'opencode' ? agent : null);
+    } catch (err) {
+      console.error(`  ✖ Adapter "${pl}" failed: ${err.message}`);
+      continue;
+    }
     const count = writeFiles(files, outDir, { force: o.force });
     const outRel = outDir === CWD ? '.' : relative(CWD, outDir) || outDir;
     console.log(`  ✓ ${count} file(s) → ${outRel}`);
@@ -707,15 +703,21 @@ async function main() {
   // ── For single platform: copy platform files to CWD ──
   // (so opencode.json, CLAUDE.md etc appear in the project root)
   if (!isAll && outDir !== CWD) {
-    const gen = GENERATORS[platform];
-    const files = platform === 'opencode' ? gen(agents, agent) : gen(agents);
-    for (const f of files) {
-      const src = join(outDir, f.path);
-      const dst = join(CWD, f.path);
-      if (existsSync(src)) {
-        mkdirSync(dirname(dst), { recursive: true });
-        copyFileSync(src, dst);
-        console.log(`  ✓ ${f.path} → .`);
+    let files;
+    try {
+      files = await generatePlatformFiles(platform, agents, skills, platform === 'opencode' ? agent : null);
+    } catch (err) {
+      // Adapter already failed above — skip copy
+    }
+    if (files) {
+      for (const f of files) {
+        const src = join(outDir, f.path);
+        const dst = join(CWD, f.path);
+        if (existsSync(src)) {
+          mkdirSync(dirname(dst), { recursive: true });
+          copyFileSync(src, dst);
+          console.log(`  ✓ ${f.path} → .`);
+        }
       }
     }
   }
@@ -746,9 +748,20 @@ async function main() {
   // We pass THIS installer's readline (`rl`/`ask`) to avoid opening a second
   // reader on process.stdin (which caused duplicate character echo on input).
   try {
-    const { generateAgentsConfig } = await import(
-      pathToFileURL(join(resolve(CLI_DIR, '..', '..'), 'tools', 'init-agents-config.mjs')).href
-    );
+    const coreDir = await resolveCoreDir(CWD);
+    // Resolve tools/ from project root (same logic as --check above).
+    let toolsDir = null;
+    const searchRoots = coreDir
+      ? [coreDir, join(coreDir, '..'), join(coreDir, '..', '..')]
+      : [join(CLI_DIR, '..', '..')];
+    for (const candidate of searchRoots) {
+      if (existsSync(join(candidate, 'tools', 'init-agents-config.mjs'))) {
+        toolsDir = join(candidate, 'tools');
+        break;
+      }
+    }
+    if (!toolsDir) throw new Error('tools/init-agents-config.mjs not found');
+    const { generateAgentsConfig } = await import(pathToFileURL(join(toolsDir, 'init-agents-config.mjs')).href);
     await generateAgentsConfig({ outDir: CWD, yes: o.yes, rl, ask });
   } catch (err) {
     console.warn(`\n  ⚠ AGENTS config generation skipped: ${err.message}`);
