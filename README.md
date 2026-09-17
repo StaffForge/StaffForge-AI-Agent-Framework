@@ -78,7 +78,7 @@ Both work on Linux, macOS, and Windows — Node.js ≥ 18 is the only requiremen
 
 Interactive prompts ask for:
 - **Platform** — opencode, claude-code, cursor, copilot, aider, gemini-cli, or all
-- **Default agent** — orchestrator, build, or plan
+- **Default agent** — orchestrator (or plan; use Tab to switch)
 - **Location** — project root (default), isolated `./staffforge/`, or global (~/.config/staffforge/)
 - **VCS provider** — git, svn, hg, tfvc, perforce, or custom
 - **Workflow** — git-flow, github-flow, gitlab-flow, trunk-based, or custom
@@ -93,9 +93,8 @@ npm exec --yes -- @staffforge/staffforge-ai-agent-framework
 #   Reinstall? [Y/n]:  ← press Enter
 ```
 
-> **⚠️ npm 9.x note:** If `npx github:user/repo` fails with `could not determine executable to run`,
-> use `npm exec --yes -- github:user/repo` instead. Both invoke the same underlying
-> engine; the `npm exec` form avoids a parsing issue in npm 9.2.0's npx.
+> **💡 npm exec recommended:** The `npm exec --yes --` form is the most reliable installation method across all npm versions.
+> The `npx github:user/repo` form may fail with `could not determine executable to run` on npm 9.x.
 
 ### Non-interactive with CLI flags
 
@@ -132,7 +131,7 @@ npm exec --yes -- @staffforge/staffforge-ai-agent-framework --force
 | Flag | Description | Values |
 |------|-------------|--------|
 | `--platform` | Target platform | `opencode`, `claude-code`, `cursor`, `copilot`, `aider`, `gemini-cli`, `all` |
-| `--agent` | Default agent mode | `orchestrator`, `build`, `plan` |
+| `--agent` | Default agent mode | `orchestrator`, `plan` |
 | `--out` | Output directory | Any path (default: current directory) |
 | `--vcs` | Version control system | `git`, `svn`, `hg`, `tfvc`, `perforce`, `custom` |
 | `--workflow` | Workflow preset | `git-flow`, `github-flow`, `gitlab-flow`, `trunk-based`, `custom` |
@@ -185,7 +184,7 @@ node tools/export.mjs --platform opencode
 |--------|---------|
 | `opencode.json` | Agent config (modes, permissions) |
 
-Agents with `mode: primary` appear in the **Tab** cycle (orchestrator, build, plan).
+Agents with `mode: primary` appear in the **Tab** cycle (orchestrator, plan).
 Agents with `mode: subagent` appear in the **@** autocomplete menu (148 specialized agents).
 
 > The installer (v2.7.3+) writes config files directly to the target (project root for single-platform installs) — no `adapters/opencode/output/` staging step. Use `--out <dir>` only to redirect the output elsewhere.
@@ -308,7 +307,7 @@ Runs the export for any supported platform and copies the config files to your p
 
 ```bash
 node install.mjs --platform opencode --agent orchestrator
-node install.mjs --platform claude-code --agent build
+node install.mjs --platform claude-code --agent plan
 node install.mjs --platform all
 node install.mjs -y                                 # defaults (opencode, orchestrator, project-local)
 node install.mjs --vcs svn --workflow trunk-based   # SVN with trunk-based workflow
@@ -317,7 +316,7 @@ node install.mjs --vcs svn --workflow trunk-based   # SVN with trunk-based workf
 The installer asks five questions when run interactively:
 
 1. **Platform** — which AI coding assistant(s) to target
-2. **Default agent** — orchestrator (full control), build (fast edits), or plan (read-only)
+2. **Default agent** — orchestrator (full control) or plan (read-only)
 3. **Location** — project-local (`./staffforge/`) or global (`~/.config/staffforge/`)
 4. **VCS provider** — Git, SVN, Mercurial, TFVC, Perforce, or custom
 5. **Workflow** — Git Flow, GitHub Flow, GitLab Flow, Trunk Based, or custom
@@ -333,11 +332,11 @@ After selection, the installer:
 | Mode | Tab cycle | @ mention | Permissions |
 |------|-----------|-----------|-------------|
 | **orchestrator** | ✓ default | ✓ | Full tools |
-| **build** | ✓ | ✓ | Full tools |
 | **plan** | ✓ | ✓ | Read-only |
+| **build** | — | ✓ | Full tools |
 | 148 subagents | — | ✓ | Varies |
 
-- **Tab** — Cycle: orchestrator → build → plan
+- **Tab** — Cycle: orchestrator → plan
 - **@name** — Invoke any subagent (e.g., `@security`, `@testing`, `@ci`, `@docker`, `@flask`, `@react`, `@postgres`)
 - Orchestrator is the default agent. It detects task type AND technologies from your prompt, then routes to the right specialist agents.
 

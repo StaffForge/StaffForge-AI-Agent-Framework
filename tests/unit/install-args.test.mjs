@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..', '..');
 const cli = join(root, 'packages', 'cli', 'install.mjs');
 const platforms = ['opencode', 'claude-code', 'cursor', 'copilot', 'aider', 'gemini-cli'];
-const agents = ['orchestrator', 'build', 'plan'];
+const agents = ['orchestrator', 'plan'];
 
 let passed = 0;
 let failed = 0;
