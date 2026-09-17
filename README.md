@@ -61,7 +61,7 @@ examples/         ← Usage examples
 
 Two equivalent install methods:
 
-**A) npm registry (recommended)** — no git dependency, EALLOWGIT-safe (works on npm ≥ 11.10 with `allow-git=none`):
+**A) npm registry (recommended)** — no git dependency, cross-platform safe (works on npm ≥ 11.10 with `allow-git=none`):
 
 ```bash
 npm exec --yes -- @staffforge/staffforge-ai-agent-framework
@@ -392,7 +392,7 @@ The orchestrator:
 ### One-line install (any project, no clone needed)
 
 ```bash
-# npm registry (recommended, EALLOWGIT-safe):
+# npm registry (recommended):
 npm exec --yes -- @staffforge/staffforge-ai-agent-framework [options]
 
 # GitHub direct (alternative):
