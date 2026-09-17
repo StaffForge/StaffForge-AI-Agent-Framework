@@ -43,7 +43,7 @@ Usage: node tools/install.mjs [options]
 
 Options:
   --help, -h             Show this help message
-  --agent <name>         Set default agent (orchestrator only; build/plan are @subagents)
+  --agent <name>         Set default agent (orchestrator)
   --platform <name>      Target platform (opencode, claude-code, cursor, copilot, aider, gemini-cli)
   --out <dir>            Output directory (default: project root)
 
@@ -93,8 +93,7 @@ function copyDirRecursive(src, dest) {
 async function promptDefaultAgent() {
   console.log('\nStaffForge AI Agent Framework - Installer\n');
   console.log('Select the default agent mode:\n');
-  console.log('  orchestrator  - Default agent. Coordinates work, manages Git Flow, routes tasks (recommended)');
-  console.log('  (build and plan are now @subagents — accessible via @build/@plan)\n');
+  console.log('  orchestrator  - Default agent. Coordinates work, manages Git Flow, routes tasks (recommended)\n');
 
   const answer = await question('? Default agent [orchestrator]: ');
   return (answer || 'orchestrator').trim().toLowerCase();
@@ -112,8 +111,8 @@ async function main() {
     defaultAgent = await promptDefaultAgent();
   }
 
-  if (!['orchestrator', 'build', 'plan'].includes(defaultAgent)) {
-    console.error('Error: Invalid agent. Use "orchestrator", "build", or "plan".');
+  if (!['orchestrator', 'plan'].includes(defaultAgent)) {
+    console.error('Error: Invalid agent. Use "orchestrator" or "plan".');
     process.exit(1);
   }
 
@@ -174,7 +173,7 @@ async function main() {
   console.log(`\n✓ ${copiedCount} file(s) exported to: ${outDir}`);
   if (platform === 'opencode') {
     console.log(`✓ Default agent: ${defaultAgent}`);
-    console.log('\nUse Tab to switch between orchestrator, build, and plan modes.\n');
+    console.log('\nUse Tab to switch between orchestrator and plan modes.\n');
   }
 
   // ── Project Rules setup ────────────────────────────────────────────────

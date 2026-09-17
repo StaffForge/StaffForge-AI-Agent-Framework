@@ -34,7 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 async function resolveFromNpm() {
   try {
-    const specifier = '@staffforge/core/index.mjs';
+    const specifier = '@staffforge/core';
     const resolved = await import.meta.resolve(specifier);
     if (resolved) {
       const coreDir = dirname(fileURLToPath(resolved));

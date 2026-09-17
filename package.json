@@ -36,8 +36,7 @@
     "auto-init": "node scripts/auto-init.mjs"
   },
   "bin": {
-    "staffforge": "./packages/cli/install.mjs",
-    "auto-init": "./scripts/auto-init.mjs"
+    "staffforge": "./packages/cli/install.mjs"
   },
   "files": [
     "install.mjs",

@@ -8,7 +8,7 @@
  *
  * Options:
  *   --platform <name>   opencode | claude-code | cursor | copilot | aider | gemini-cli | all
- *   --agent <name>      orchestrator | build | plan
+ *   --agent <name>      orchestrator (default)
  *   --out <dir>         output directory (default: CWD)
  *   --vcs <name>        git | svn | hg | tfvc | perforce | custom (default: git)
  *   --workflow <name>   git-flow | github-flow | gitlab-flow | trunk-based | custom (default: git-flow)
@@ -77,14 +77,14 @@ function help() {
   console.log(`StaffForge AI Agent Framework — Installer
 
 USAGE
-  npm exec --yes -- github:StaffForge/StaffForge-AI-Agent-Framework -- [options]
-  npx github:StaffForge/StaffForge-AI-Agent-Framework [options]
+  npx @staffforge/staffforge-ai-agent-framework [options]
+  npm exec --yes -- @staffforge/staffforge-ai-agent-framework -- [options]
   node packages/cli/install.mjs [options]
 
 OPTIONS
   --platform <name>   Target platform
                       (opencode, claude-code, cursor, copilot, aider, gemini-cli, all)
-  --agent <name>      Default agent (orchestrator only; build/plan are @subagents)
+  --agent <name>      Default agent (orchestrator, plan)
   --out <dir>         Output directory (default: current directory)
   --force, -f        Overwrite existing generated files (backs up <file>.bak)
   --vcs <name>        VCS provider (git, svn, hg, tfvc, perforce, custom)
