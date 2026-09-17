@@ -11,7 +11,7 @@
     "sqlite-storage.mjs"
   ],
   "dependencies": {
-    "@staffforge/core": "2.0.0"
+    "@staffforge/core": "^2.0.1"
   },
   "engines": {
     "node": ">=22.0.0"

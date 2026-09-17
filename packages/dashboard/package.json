@@ -6,7 +6,7 @@
   "main": "./index.mjs",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@staffforge/core": "2.0.0"
+    "@staffforge/core": "^2.0.1"
   },
   "engines": {
     "node": ">=18.0.0"
