@@ -8,7 +8,7 @@
     "name": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
-      "description": "Unique skill identifier (kebab-case, must match filename without extension)"
+      "description": "Unique skill identifier (kebab-case, must match its parent skill directory name)"
     },
     "description": {
       "type": "string",

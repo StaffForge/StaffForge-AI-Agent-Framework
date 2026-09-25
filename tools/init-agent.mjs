@@ -14,7 +14,7 @@ Agent names should be kebab-case (e.g. async-patterns).
 The generated agent follows C.R.E.A.D.O. methodology:
   - Contexto / Restricciones / Especificación / Audiencia / Datos de entrada / Output
   - input_schema / output_schema / guardrails in frontmatter
-See skills/agent-design-guide.md for the full specification.
+See skills/agent-design-guide/SKILL.md for the full specification.
 `;
 
 const CATEGORIES = ['core', 'technology', 'domain', 'platform', 'utility'];
@@ -170,7 +170,7 @@ async function main() {
   console.log(`│ output_dlp:         ${enableDlp}`);
   console.log(`│ hallucination_check: ${enableHallucination}`);
   console.log(`└─────────────────────────────────────────────────────`);
-  console.log(`\n📖 See skills/agent-design-guide.md for the full C.R.E.A.D.O. + Guardrails spec.\n`);
+  console.log(`\n📖 See skills/agent-design-guide/SKILL.md for the full C.R.E.A.D.O. + Guardrails spec.\n`);
 }
 
 main();

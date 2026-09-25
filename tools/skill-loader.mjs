@@ -49,12 +49,20 @@ export class SkillRegistry {
 
   load() {
     if (this._skills) return this;
-    const files = readdirSync(this._skillDir).filter((f) => f.endsWith('.md'));
+    const entries = readdirSync(this._skillDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .sort((a, b) => a.name.localeCompare(b.name));
     this._skills = [];
-    for (const file of files.sort()) {
-      const content = readFileSync(join(this._skillDir, file), 'utf-8');
+    for (const entry of entries) {
+      const file = join(entry.name, 'SKILL.md');
+      const skillPath = join(this._skillDir, file);
       try {
-        this._skills.push(parseSkill(file, content));
+        const content = readFileSync(skillPath, 'utf-8');
+        const skill = parseSkill(file, content);
+        if (skill.name !== entry.name) {
+          throw new Error(`${file}: frontmatter name must match its directory name`);
+        }
+        this._skills.push(skill);
       } catch (err) {
         console.warn(`skill-loader: ${file}: ${err.message}`);
       }

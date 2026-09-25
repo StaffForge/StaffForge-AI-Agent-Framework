@@ -282,21 +282,32 @@ function loadAgents(dir) {
 function loadSkills(dir) {
   if (!existsSync(dir)) return [];
   const skills = [];
-  const entries = readdirSync(dir);
-  for (const f of entries.sort()) {
-    if (!f.endsWith('.md')) continue;
-    const fp = join(dir, f);
-    if (!statSync(fp).isFile()) continue;
-    const content = readFileSync(fp, 'utf-8');
-    const parsed = parseFrontmatter(content);
-    if (!parsed) {
-      console.warn(`  ⚠ Skipping skill ${f}: no valid frontmatter`);
+  const entries = readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const entry of entries) {
+    const filename = join(entry.name, 'SKILL.md');
+    const skillPath = join(dir, filename);
+    if (!existsSync(skillPath)) {
+      console.warn(`  ⚠ Skipping skill ${entry.name}: missing ${filename}`);
       continue;
     }
-    const name = parsed.frontmatter.name || f.replace(/\.md$/, '');
+
+    const content = readFileSync(skillPath, 'utf-8');
+    const parsed = parseFrontmatter(content);
+    if (!parsed) {
+      console.warn(`  ⚠ Skipping skill ${filename}: no valid frontmatter`);
+      continue;
+    }
+    const name = parsed.frontmatter.name || entry.name;
+    if (name !== entry.name) {
+      console.warn(`  ⚠ Skipping skill ${filename}: frontmatter name must match directory name`);
+      continue;
+    }
     skills.push({
       name,
-      filename: f,
+      filename,
       frontmatter: parsed.frontmatter,
       body: parsed.body || content,
     });
@@ -598,7 +609,7 @@ async function main() {
   const skillsDir = join(fw, 'skills');
   const skills = loadSkills(skillsDir);
   if (skills.length > 0) {
-    console.log(`  Skills:   ${skills.length} files in ${relative(CWD, skillsDir) || skillsDir}`);
+    console.log(`  Skills:   ${skills.length} directories in ${relative(CWD, skillsDir) || skillsDir}`);
   }
 
   // Determine options

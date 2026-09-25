@@ -10,6 +10,10 @@ author: StaffForge
 
 # Guía de Diseño de Agentes — C.R.E.A.D.O. + Guardrails
 
+## Propósito
+
+Establecer un estándar verificable para crear y revisar agentes de StaffForge.
+
 Todo agente en StaffForge debe cumplir estrictamente esta especificación.
 La plantilla `templates/agent.md` ya incluye la estructura base; úsala siempre para nuevos agentes.
 

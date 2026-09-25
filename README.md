@@ -45,6 +45,7 @@ StaffForge is **not** an agent-execution runtime like LangGraph or CrewAI — it
 
 ```
 agents/           ← Canonical agent definitions (Markdown + frontmatter)
+skills/<name>/    ← Canonical skill directories; each entry point is SKILL.md
 adapters/         ← Platform-specific exporters (OpenCode, Claude Code, Cursor, etc.)
 packages/         ← Monorepo packages (core, sdk, plugin-sdk, cli, dashboard, enterprise)
 schemas/          ← JSON Schema for agent validation

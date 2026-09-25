@@ -23,7 +23,7 @@ Addendum to `AGENTS.md` defining project settings: tech stack, conventions, cons
 - **Code Formatter**: Prettier (`.prettierrc`) + ESLint (`.eslintrc.json`)
 - **Documentation Format**: JSDoc-style block comments with mandatory coverage for public APIs
 - **Agent/Skill Frontmatter**: Explicit `mode`, `tools.write`, `tools.bash`, `tools.edit` — no implicit permissions
-- **Agent Files**: Canonical definitions in `agents/*.md`, skills in `skills/*.md`, exported per-platform via adapters
+- **Agent Files**: Canonical definitions in `agents/*.md`, skills in `skills/<name>/SKILL.md`, exported per-platform via adapters
 
 ## Operational Rules & Constraints
 ### Forbidden Operations (NEVER)

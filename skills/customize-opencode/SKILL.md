@@ -9,7 +9,11 @@ author: StaffForge
 ---
 # Customize OpenCode
 
-Use ONLY when the user is editing or creating opencode's own configuration.
+## Purpose
+
+Safely configure OpenCode-specific agents, skills, plugins, MCP servers, and permissions.
+
+Use ONLY when the user is editing or creating OpenCode's own configuration.
 
 ## Scope
 

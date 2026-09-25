@@ -9,7 +9,16 @@ author: StaffForge
 ---
 # Database Review
 
+## Purpose
+
+Review database changes for schema correctness, migration safety, query performance, and security.
+
 Use when reviewing database schema changes, migrations, or query performance.
+
+## Rules
+
+- Assess migration safety before recommending destructive schema changes.
+- Treat production data, credentials, and connection details as sensitive.
 
 ## Review Checklist
 

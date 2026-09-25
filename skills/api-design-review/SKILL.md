@@ -9,7 +9,16 @@ author: StaffForge
 ---
 # API Design Review
 
+## Purpose
+
+Review API contracts for consistent resource modeling, protocol usage, responses, and error handling.
+
 Use when reviewing REST API designs, gRPC service definitions, or OpenAPI specifications.
+
+## Rules
+
+- Evaluate the published contract and its documented behavior; do not infer undocumented requirements.
+- Flag inconsistencies and risks with the relevant checklist item.
 
 ## REST Checklist
 

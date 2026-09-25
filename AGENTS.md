@@ -1,12 +1,12 @@
 # StaffForge AI Agent Framework
 
-Multi-provider agent framework. Canonical agents in `agents/*.md`, skills in `skills/*.md`.
+Multi-provider agent framework. Canonical agents in `agents/*.md`, skills in `skills/<name>/SKILL.md`.
 
 ## Structure
 
 ```
 agents/             — 150 agent definitions with YAML frontmatter (mode, description, tools)
-skills/             — 4 skill definitions with YAML frontmatter (name, description, keywords, globs)
+skills/             — skill directories; each contains a `SKILL.md` entry point with YAML frontmatter
 adapters/            — Platform exporters per platform (opencode, claude-code, cursor, copilot, aider, gemini-cli)
 schemas/             — JSON Schema for validation (agent.schema.json, model.schema.json, skill.schema.json)
 templates/           — Scaffolding templates for new agents and skills (agent.md, skill.md)
@@ -72,7 +72,20 @@ wizard covering: tech stack → conventions → rules → workflow → documenta
 ## Skills
 
 Skills are reusable instruction sets that provide specialized guidance for specific tasks.
-They live as canonical files in `skills/*.md` and are exported per-platform alongside agents.
+They live in canonical `skills/<name>/SKILL.md` entry points and are exported per-platform alongside agents.
+
+```text
+skills/
+└── <name>/
+    ├── SKILL.md      # required entry point
+    ├── scripts/      # optional executable helpers
+    ├── references/   # optional supporting documentation
+    └── assets/       # optional static resources, templates, or examples
+```
+
+`SKILL.md` is the sole specification entry point. It must contain the skill metadata,
+description, purpose, instructions, and applicable rules; it may link to auxiliary files in
+its own directory. Do not create empty optional directories.
 
 ### Skill frontmatter
 
@@ -90,7 +103,7 @@ author: StaffForge
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `name` | yes | Unique kebab-case identifier (matches filename) |
+| `name` | yes | Unique kebab-case identifier (matches its skill directory) |
 | `description` | yes | One-line summary of when to load this skill |
 | `version` | no | SemVer (default: 0.1.0 when scaffolding) |
 | `keywords` | no | Task-matching keywords — skill loads when prompt matches |
@@ -100,7 +113,7 @@ author: StaffForge
 
 ### Skills pipeline
 
-1. Define skill in `skills/<name>.md` (or use `npm run init-skill <name>`)
+1. Define a skill in `skills/<name>/SKILL.md` (or use `npm run init-skill <name>)
 2. Validate with `npm run validate` (validates frontmatter + non-empty body)
 3. Export with `npm run export` (generates platform-specific skill files in each adapter's output)
 4. Install with `node install.mjs --platform <name>` (copies output to project root; v2.7.3+ writes directly to target with per-platform agents symlinks)
