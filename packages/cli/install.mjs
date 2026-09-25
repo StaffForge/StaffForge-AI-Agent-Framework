@@ -41,6 +41,13 @@ import {
   getSkillsDir,
   getFrameworkVersion,
 } from './resolve-resources.mjs';
+import {
+  SkillRegistry,
+  discoverSkillRoots,
+  composeAgents,
+  loadConfiguration,
+  filterResourcesForPlatform,
+} from '@staffforge/core';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_DIR = resolve(__dirname);
@@ -278,41 +285,13 @@ function loadAgents(dir) {
   return agents;
 }
 
-// ── Load skills from a directory ──
-function loadSkills(dir) {
-  if (!existsSync(dir)) return [];
-  const skills = [];
-  const entries = readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const entry of entries) {
-    const filename = join(entry.name, 'SKILL.md');
-    const skillPath = join(dir, filename);
-    if (!existsSync(skillPath)) {
-      console.warn(`  ⚠ Skipping skill ${entry.name}: missing ${filename}`);
-      continue;
-    }
-
-    const content = readFileSync(skillPath, 'utf-8');
-    const parsed = parseFrontmatter(content);
-    if (!parsed) {
-      console.warn(`  ⚠ Skipping skill ${filename}: no valid frontmatter`);
-      continue;
-    }
-    const name = parsed.frontmatter.name || entry.name;
-    if (name !== entry.name) {
-      console.warn(`  ⚠ Skipping skill ${filename}: frontmatter name must match directory name`);
-      continue;
-    }
-    skills.push({
-      name,
-      filename,
-      frontmatter: parsed.frontmatter,
-      body: parsed.body || content,
-    });
+// ── Load skills from all applicable scopes ──
+function loadSkills(frameworkDir, workspaceDir, frameworkSkillsDir) {
+  const registry = new SkillRegistry(discoverSkillRoots({ frameworkDir, frameworkSkillsDir, workspaceDir }));
+  for (const error of registry.errors()) {
+    console.warn(`  ⚠ Skipping skill: ${error}`);
   }
-  return skills;
+  return registry.all();
 }
 
 // ── Platform adapter loader (delegates to @staffforge/core) ────────────
@@ -346,7 +325,8 @@ async function generatePlatformFiles(platform, agents, skills, defaultAgent) {
   // All adapters accept (agents, skills). OpenCode also accepts defaultAgent
   // via its second param — but the canonical adapter derives it internally.
   // We call with (agents, skills) and patch default_agent afterward for OpenCode.
-  const files = adapter(agents, skills);
+  const scoped = filterResourcesForPlatform({ agents, skills }, platform);
+  const files = adapter(scoped.agents, scoped.skills);
 
   // For OpenCode: patch default_agent if user specified --agent
   if (platform === 'opencode' && defaultAgent) {
@@ -605,11 +585,17 @@ async function main() {
     exit(1);
   }
 
-  // Load skills (optional — directory may not exist)
-  const skillsDir = join(fw, 'skills');
-  const skills = loadSkills(skillsDir);
+  // Load rules and skills from framework, global, and project scopes.
+  const configuration = loadConfiguration({ workspaceDir: CWD });
+  const contextualAgents = composeAgents(agents, configuration);
+  const frameworkSkillsDir = await getSkillsDir();
+  const skills = loadSkills(fw, CWD, frameworkSkillsDir);
   if (skills.length > 0) {
-    console.log(`  Skills:   ${skills.length} directories in ${relative(CWD, skillsDir) || skillsDir}`);
+    const scopes = [...new Set(skills.map((skill) => skill.scope))].join(', ');
+    console.log(`  Skills:   ${skills.length} definitions (${scopes})`);
+  }
+  if (configuration.rules.length > 0) {
+    console.log(`  Rules:    ${configuration.rules.length} source(s), global → project → agent`);
   }
 
   // Determine options
@@ -668,7 +654,7 @@ async function main() {
     }
     let files;
     try {
-      files = await generatePlatformFiles(pl, agents, skills, pl === 'opencode' ? agent : null);
+      files = await generatePlatformFiles(pl, contextualAgents, skills, pl === 'opencode' ? agent : null);
     } catch (err) {
       console.error(`  ✖ Adapter "${pl}" failed: ${err.message}`);
       continue;
@@ -716,7 +702,7 @@ async function main() {
   if (!isAll && outDir !== CWD) {
     let files;
     try {
-      files = await generatePlatformFiles(platform, agents, skills, platform === 'opencode' ? agent : null);
+      files = await generatePlatformFiles(platform, contextualAgents, skills, platform === 'opencode' ? agent : null);
     } catch (err) {
       // Adapter already failed above — skip copy
     }

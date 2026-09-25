@@ -35,7 +35,7 @@
       "items": {
         "enum": ["opencode", "claude-code", "cursor", "copilot", "aider", "gemini-cli"]
       },
-      "description": "Platforms this skill is compatible with (empty = all platforms)"
+      "description": "Platforms this skill is compatible with (missing or empty = all platforms; filtered before adapter rendering)"
     },
     "author": {
       "type": "string",

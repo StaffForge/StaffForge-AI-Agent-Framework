@@ -52,6 +52,9 @@ Shared programmatic APIs consumed by CLI tools and external consumers.
 |---|---|---|---|
 | Agent Registry | `packages/core/lib/registries/agent-registry.mjs` | `AgentRegistry`, `getAgentRegistry()` |
 | Adapter Registry | `packages/core/lib/registries/adapter-registry.mjs` | `AdapterRegistry`, `getAdapterRegistry()` |
+| Skill Registry | `packages/core/lib/registries/skill-registry.mjs` | `SkillRegistry`, `getSkillRegistry()`, `discoverSkillRoots()` |
+| Configuration | `packages/core/lib/configuration.mjs` | `loadConfiguration()`, `composeAgents()` |
+| Resource Scope | `packages/core/lib/resource-scope.mjs` | `filterResourcesForPlatform()` |
 | Capability Engine | `packages/core/lib/engines/capability-engine.mjs` | `CapabilityEngine`, `getCapabilityEngine()` |
 | Router | `packages/core/lib/router.mjs` | `Router`, `getRouter()` |
 | DAG | `packages/core/lib/dag.mjs` | `DAG` |
@@ -278,35 +281,47 @@ Placeholder-based template:
 - `__TITLE__` → Title-Case name
 - Scaffolds via: `node tools/init-agent.mjs <name>`
 
-### 2.4 Platform Adapters (`adapters/<platform>/index.mjs`)
+### 2.4 Scoped configuration
 
-Each exports a default function: `(agents[]) → [{path, content}]`
+Rules and skills are resolved once before adapter translation. The resolver loads user-level rules,
+project ancestor rules, and scoped skill roots in deterministic precedence order. Adapters receive
+validated, platform-filtered resources and do not perform discovery or policy resolution.
+
+Rules use this order: global → project `AGENTS.md` → `PROJECT_RULES.md` → `AGENTS_ANEX.md` →
+agent-specific → task-specific. Project skills live under `.staffforge/skills/<name>/SKILL.md`;
+user skills live under `~/.agents/skills/<name>/SKILL.md` or `~/.config/staffforge/skills/`.
+
+### 2.5 Platform Adapters (`adapters/<platform>/index.mjs`)
+
+Each exports a default function: `(agents[], skills[]) → [{path, content}]`
 
 | Platform | Output | Format |
 |---|---|---|
-| opencode | 1 file | `opencode.json` |
-| claude-code | 150 files | `CLAUDE.md` + `.claude/agents/*.md` (symlink to canonical `agents/`) |
-| cursor | 150 files | `.cursor/rules/*.mdc` |
-| copilot | 152+ files | `.github/copilot-instructions.md` (neutral) + `.github/agents/*.agent.md` (150, incl. `@orchestrator`) + `.github/instructions/*.instructions.md` (skills) |
-| aider | 1 file | `.aider.rules.md` |
-| gemini-cli | 150 files | `.gemini/*.md` |
+| opencode | agents + skills | `opencode.json` + `.opencode/skills/*.md` |
+| claude-code | agents + skills | `CLAUDE.md` + `.claude/agents/*.md` + `.claude/skills/*.md` |
+| cursor | agents + skills | `.cursor/rules/*.mdc` |
+| copilot | agents + skills | `.github/copilot-instructions.md` + `.github/agents/*.agent.md` + `.github/instructions/*.instructions.md` |
+| aider | 1 aggregate file | `.aider.rules.md` |
+| gemini-cli | agents + skills | `.gemini/*.md` |
 
-### 2.5 Exporter (`tools/export.mjs`)
+### 2.6 Exporter (`tools/export.mjs`)
 
 - CLI: `node tools/export.mjs --platform <name> [--out <dir>]`
 - Loads all 150 agents
 - Dynamic imports adapter
-- Calls adapter.default(agents)
+- Loads scoped rules and skills
+- Filters resources by `compatible_platforms`
+- Calls adapter.default(agents, skills)
 - Writes output files
 
-### 2.6 Installer (`packages/cli/install.mjs`)
+### 2.7 Installer (`packages/cli/install.mjs)
 
 - Universal installer (local + npx)
 - Downloads framework, runs exporter, copies to project
 - Supports project-level and global installs
 - 6 platforms + "all"
 
-### 2.7 Orchestrator (`agents/orchestrator.md`)
+### 2.8 Orchestrator (`agents/orchestrator.md`)
 
 - Default agent (Tab key in OpenCode)
 - Routes tasks to subagents using `CapabilityEngine` intent analysis + `TaskMapper` pipeline resolution
@@ -315,7 +330,7 @@ Each exports a default function: `(agents[]) → [{path, content}]`
 - References `ORCHESTRATOR_MATRIX.md` for pipeline definitions
 - Enforces three-layer Guardrails at every delegation
 
-### 2.8 Pipeline Matrix (`ORCHESTRATOR_MATRIX.md`)
+### 2.9 Pipeline Matrix (`ORCHESTRATOR_MATRIX.md`)
 
 Defines 6 task types with DAG pipelines:
 

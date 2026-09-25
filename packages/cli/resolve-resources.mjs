@@ -188,7 +188,16 @@ export async function getAgentsDir() {
  */
 export async function getSkillsDir() {
   const core = await resolveCoreDir();
-  return core ? join(core, 'skills') : null;
+  if (!core) return null;
+
+  const candidates = [
+    join(core, 'skills'),
+    // Canonical skills may live beside packages/ in the monorepo or published
+    // top-level framework package rather than inside @staffforge/core.
+    resolve(__dirname, '..', '..', 'skills'),
+    resolve(core, '..', '..', 'skills'),
+  ];
+  return candidates.find((dir) => existsSync(dir)) || null;
 }
 
 /**

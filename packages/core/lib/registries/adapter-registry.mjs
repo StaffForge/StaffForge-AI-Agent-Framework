@@ -1,6 +1,7 @@
 import { readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { resolveRoot } from '../find-project-root.mjs';
+import { filterResourcesForPlatform } from '../resource-scope.mjs';
 
 const root = resolveRoot(import.meta.url);
 
@@ -45,7 +46,8 @@ export class AdapterRegistry {
 
     mkdirSync(resolvedOut, { recursive: true });
 
-    const files = adapter(agents, skills);
+    const scoped = filterResourcesForPlatform({ agents, skills }, platform);
+    const files = adapter(scoped.agents, scoped.skills);
     for (const { path, content } of files) {
       const fullPath = join(resolvedOut, path);
       mkdirSync(dirname(fullPath), { recursive: true });

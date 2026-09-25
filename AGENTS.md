@@ -69,6 +69,23 @@ settings: tech stack, conventions, constraints, workflow, and documentation stan
 The orchestrator delegates to `@project-rules` before any other work. The agent runs a 5-question
 wizard covering: tech stack → conventions → rules → workflow → documentation.
 
+### Configuration scopes
+
+StaffForge resolves rules centrally before adapter export. Global rules are read from the user
+configuration roots (`~/.agents/AGENTS.md`, `~/.agents/AGENTS_ANEX.md`,
+`~/AGENTS.md`, `~/AGENTS_ANEX.md`, `~/.config/staffforge/AGENTS.md`, and
+`~/.config/staffforge/AGENTS_ANEX.md`) when present. Project ancestors contribute `AGENTS.md`,
+`PROJECT_RULES.md`, and `AGENTS_ANEX.md`. The effective order is global → project base → project
+rules → project annex → agent-specific instructions → task-specific instructions. Duplicate paths
+and identical contents are removed, and symlinked rule files are rejected.
+
+Project-only skills belong under `<workspace>/.staffforge/skills/<name>/SKILL.md`. User-level skills
+may be placed under `~/.agents/skills/<name>/SKILL.md` or `~/.config/staffforge/skills/<name>/SKILL.md`.
+The framework's canonical skills remain under `skills/<name>/SKILL.md`. The first valid skill with
+a given name wins by scope; discovery never executes skill resources. See
+[`docs/configuration-scopes.md`](docs/configuration-scopes.md) for the complete model and runtime
+limitations.
+
 ## Skills
 
 Skills are reusable instruction sets that provide specialized guidance for specific tasks.

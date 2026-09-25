@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, lstatSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
@@ -61,10 +61,16 @@ for (const agent of agents) {
 
 const skillsDir = join(root, 'skills');
 const skillFiles = [];
+if (existsSync(skillsDir) && lstatSync(skillsDir).isSymbolicLink()) {
+  console.error('FAIL  skills/: skill root must not be a symbolic link');
+  totalErrors++;
+}
 if (existsSync(skillsDir)) {
   const entries = readdirSync(skillsDir, { withFileTypes: true });
   const rootSkillFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-  const skillDirs = entries.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+  const skillDirs = entries
+    .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const file of rootSkillFiles) {
     console.error(`FAIL  skill: ${file.name}: skill specifications must be located at skills/<name>/SKILL.md`);
@@ -72,10 +78,20 @@ if (existsSync(skillsDir)) {
   }
 
   for (const dir of skillDirs) {
+    if (dir.isSymbolicLink()) {
+      console.error(`FAIL  skill: ${dir.name}: skill directory must not be a symbolic link`);
+      totalErrors++;
+      continue;
+    }
     const file = join(dir.name, 'SKILL.md');
     const skillPath = join(skillsDir, file);
     if (!existsSync(skillPath)) {
       console.error(`FAIL  skill: ${dir.name}: missing required ${file}`);
+      totalErrors++;
+      continue;
+    }
+    if (lstatSync(skillPath).isSymbolicLink()) {
+      console.error(`FAIL  skill: ${file}: SKILL.md must not be a symbolic link`);
       totalErrors++;
       continue;
     }

@@ -1,7 +1,13 @@
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { getAgentRegistry, getAdapterRegistry } from '@staffforge/core';
+import {
+  getAgentRegistry,
+  getAdapterRegistry,
+  composeAgents,
+  loadConfiguration,
+  filterResourcesForPlatform,
+} from '@staffforge/core';
 import { getSkillRegistry } from './skill-loader.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,18 +55,26 @@ function writeFiles(files, outDir) {
 
 async function exportForPlatform(agents, skills, platform, outDir) {
   const adapter = await adapterRegistry.getAdapter(platform);
-  const files = adapter(agents, skills || []);
+  const scoped = filterResourcesForPlatform({ agents, skills: skills || [] }, platform);
+  const files = adapter(scoped.agents, scoped.skills);
   mkdirSync(outDir, { recursive: true });
   return writeFiles(files, outDir);
 }
 
 async function main() {
   const opts = parseArgs();
-  const agents = getAgentRegistry().all();
-  const skills = getSkillRegistry().all();
+  const configuration = loadConfiguration({ workspaceDir: process.cwd() });
+  const agents = composeAgents(getAgentRegistry().all(), configuration);
+  const skills = getSkillRegistry({
+    frameworkDir: root,
+    workspaceDir: process.cwd(),
+  }).all();
 
   if (skills.length > 0) {
-    console.log(`Loaded ${skills.length} skill(s) from skills/`);
+    console.log(`Loaded ${skills.length} skill(s) across framework/global/project scopes`);
+  }
+  if (configuration.rules.length > 0) {
+    console.log(`Loaded ${configuration.rules.length} rule source(s) with global → project precedence`);
   }
 
   if (opts.all) {
