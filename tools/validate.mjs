@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yaml from 'js-yaml';
 import Ajv from 'ajv';
@@ -60,9 +60,27 @@ for (const agent of agents) {
 // ── Skills ──────────────────────────────────────────────────────────────────
 
 const skillsDir = join(root, 'skills');
-let skillFiles = [];
+const skillFiles = [];
 if (existsSync(skillsDir)) {
-  skillFiles = readdirSync(skillsDir).filter((f) => f.endsWith('.md'));
+  const entries = readdirSync(skillsDir, { withFileTypes: true });
+  const rootSkillFiles = entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+  const skillDirs = entries.filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const file of rootSkillFiles) {
+    console.error(`FAIL  skill: ${file.name}: skill specifications must be located at skills/<name>/SKILL.md`);
+    totalErrors++;
+  }
+
+  for (const dir of skillDirs) {
+    const file = join(dir.name, 'SKILL.md');
+    const skillPath = join(skillsDir, file);
+    if (!existsSync(skillPath)) {
+      console.error(`FAIL  skill: ${dir.name}: missing required ${file}`);
+      totalErrors++;
+      continue;
+    }
+    skillFiles.push(file);
+  }
 }
 
 if (skillFiles.length > 0) {
@@ -85,6 +103,13 @@ if (skillFiles.length > 0) {
       frontmatter = yaml.load(match[1]) || {};
     } catch (err) {
       console.error(`FAIL  skill: ${file}: invalid YAML in frontmatter — ${err.message}`);
+      totalErrors++;
+      continue;
+    }
+
+    const skillName = basename(dirname(file));
+    if (frontmatter.name !== skillName) {
+      console.error(`FAIL  skill: ${file}: frontmatter name must match directory name "${skillName}"`);
       totalErrors++;
       continue;
     }

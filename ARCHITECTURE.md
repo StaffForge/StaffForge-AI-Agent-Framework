@@ -346,7 +346,7 @@ Defines 6 task types with DAG pipelines:
 │   ├── profiles.yaml        # 8 task profiles
 │   ├── openai-gpt-4o.yaml   # Model example
 │   └── ...
-├── skills/                   # 4 skill definitions with YAML frontmatter
+├── skills/                   # canonical skill directories; each contains SKILL.md
 ├── schemas/
 │   ├── agent.schema.json    # Current active schema
 │   ├── agent.schema.v0.json # Frozen pre-RFC schema
@@ -526,7 +526,7 @@ Orchestrator (agents/orchestrator.md)
 | Models | ✅ 22 YAML files, 6 providers |
 | VCS abstraction | ✅ 5 provider agents: vcs-git, vcs-svn, vcs-hg, vcs-tfvc, vcs-perforce |
 | Git working tree | ✅ On `develop` |
-| Skills | ✅ 4 skill definitions in `skills/*.md` |
+| Skills | ✅ 4 skill definitions in `skills/<name>/SKILL.md` |
 
 ---
 

@@ -10,7 +10,7 @@ author: ""
 
 # __TITLE__
 
-## Description
+## Purpose
 __DESCRIPTION__
 
 ## When to use
@@ -19,6 +19,10 @@ Use this skill when the task involves working with __DOMAIN__.
 ## Instructions
 
 <!-- Add detailed instructions, workflows, and rules here -->
+
+## Rules
+
+<!-- Add constraints and safety requirements for using this skill -->
 
 ## Examples
 

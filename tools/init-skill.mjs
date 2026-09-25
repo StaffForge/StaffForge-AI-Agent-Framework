@@ -5,7 +5,7 @@
  * Usage: node tools/init-skill.mjs <skill-name>
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
@@ -15,8 +15,8 @@ const root = join(__dirname, '..');
 
 const USAGE = `Usage: node tools/init-skill.mjs <skill-name>
 
-Creates a new skill file at skills/<skill-name>.md from the template.
-Skill names should be kebab-case (e.g. database-review).
+Creates a new skill directory at skills/<skill-name>/ with SKILL.md from the template.
+Skill names must be kebab-case (e.g. database-review).
 `;
 
 function ask(query, defaultValue = '') {
@@ -44,9 +44,15 @@ async function main() {
     process.exit(name ? 0 : 1);
   }
 
-  const outPath = join(root, 'skills', `${name}.md`);
-  if (existsSync(outPath)) {
-    console.error(`ERROR: skill already exists at ${outPath}`);
+  if (!/^[a-z][a-z0-9-]*$/.test(name)) {
+    console.error('ERROR: skill name must be kebab-case (e.g. database-review)');
+    process.exit(1);
+  }
+
+  const skillDir = join(root, 'skills', name);
+  const outPath = join(skillDir, 'SKILL.md');
+  if (existsSync(skillDir)) {
+    console.error(`ERROR: skill already exists at ${skillDir}`);
     process.exit(1);
   }
 
@@ -74,6 +80,7 @@ async function main() {
     content = content.replace(/^keywords: \[\]/m, `keywords:\n${keywordsYaml}`);
   }
 
+  mkdirSync(skillDir, { recursive: true });
   writeFileSync(outPath, content, 'utf-8');
   console.log(`\nCreated ${outPath}`);
   console.log('Next steps:');
