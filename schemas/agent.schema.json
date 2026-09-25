@@ -94,7 +94,7 @@
       "items": {
         "enum": ["opencode", "claude-code", "cursor", "copilot", "aider", "gemini-cli"]
       },
-      "description": "Platforms this agent is compatible with"
+      "description": "Platforms this agent is compatible with (missing or empty = all platforms; filtered before adapter rendering)"
     },
     "permissions": {
       "type": "object",

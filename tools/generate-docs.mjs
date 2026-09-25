@@ -119,7 +119,8 @@ export class DocumentationGenerator {
     lines.push(`|-------|${platforms.map(() => '------|').join('')}`);
 
     for (const a of list.sort((x, y) => x.id.localeCompare(y.id))) {
-      const compat = a.frontmatter.compatible_platforms || platforms;
+      const declared = a.frontmatter.compatible_platforms;
+      const compat = Array.isArray(declared) && declared.length > 0 ? declared : platforms;
       const row = platforms.map((p) => (compat.includes(p) ? '✅' : '❌')).join(' | ');
       lines.push(`| ${a.id} | ${row} |`);
     }

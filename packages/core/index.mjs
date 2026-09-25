@@ -3,6 +3,9 @@ export { IEventBus } from './lib/interfaces/event-bus.mjs';
 
 export { AgentRegistry, getAgentRegistry } from './lib/registries/agent-registry.mjs';
 export { AdapterRegistry, getAdapterRegistry } from './lib/registries/adapter-registry.mjs';
+export { SkillRegistry, getSkillRegistry, discoverSkillRoots } from './lib/registries/skill-registry.mjs';
+export { discoverRules, loadConfiguration, composeAgentInstructions, composeAgents } from './lib/configuration.mjs';
+export { filterResourcesForPlatform, supportsPlatform, listSupportedPlatforms } from './lib/resource-scope.mjs';
 export { ModelRegistry, getModelRegistry } from './lib/registries/model-registry.mjs';
 export { PipelineRegistry, pipelineRegistry } from './lib/registries/pipeline-registry.mjs';
 export { IAgentProvider } from './lib/interfaces/agent-provider.mjs';

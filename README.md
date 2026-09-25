@@ -25,6 +25,7 @@ StaffForge is **not** an agent-execution runtime like LangGraph or CrewAI — it
 - [Why StaffForge](#why-staffforge)
 - [Quick start](#quick-start)
 - [Installation per platform](#installation-per-platform)
+- [Configuration scopes](#configuration-scopes)
 - [Interactive installer](#interactive-installer)
 - [Agent modes](#agent-modes)
 - [Architecture](#architecture)
@@ -167,6 +168,41 @@ npm run export:gemini      # Gemini CLI
 
 ---
 
+## Configuration scopes
+
+StaffForge keeps canonical definitions separate from runtime-specific output. Rules are resolved
+before export and skills are discovered from scoped directories.
+
+### Rules
+
+Global rules may be placed in `~/.agents/AGENTS.md`, `~/.agents/AGENTS_ANEX.md`,
+`~/AGENTS.md`, `~/AGENTS_ANEX.md`, `~/.config/staffforge/AGENTS.md`, or
+`~/.config/staffforge/AGENTS_ANEX.md`. Project ancestors may provide `AGENTS.md`,
+`PROJECT_RULES.md`, and `AGENTS_ANEX.md`.
+
+The precedence is:
+
+```text
+Global rules → project AGENTS.md → PROJECT_RULES.md → AGENTS_ANEX.md
+→ agent-specific instructions → task-specific instructions
+```
+
+### Skills
+
+```text
+<workspace>/.staffforge/skills/<name>/SKILL.md  # project
+~/.agents/skills/<name>/SKILL.md              # user
+skills/<name>/SKILL.md                        # framework
+```
+
+Each skill is namespaced by its directory. `SKILL.md` is required; `scripts/`,
+`references/`, and `assets/` are optional resources and are never executed during discovery.
+Project skills override user and framework skills with the same name. Invalid skills are skipped
+with diagnostics instead of stopping discovery.
+
+See [`docs/configuration-scopes.md`](docs/configuration-scopes.md) for the complete scope model,
+security behavior, and runtime limitations.
+
 ## Installation per platform
 
 Export agents to any supported platform:
@@ -202,7 +238,7 @@ node tools/export.mjs --platform claude-code
 |--------|---------|
 | `CLAUDE.md` | Orchestrator instructions (top-level rules) |
 | `.claude/agents/<agent>.md` | Symlink to canonical `agents/` (single source) |
-| `.claude/rules/*.mdc` | Always-on rules (no agents dumped here) |
+| `.claude/skills/<skill>.md` | Skill instruction files |
 
 Claude Code reads `CLAUDE.md` automatically from the project root. The `.claude/agents/` folder is a symlink to the canonical `agents/` directory (junction on Windows), so subagents stay in sync with the framework source.
 
@@ -222,7 +258,7 @@ node tools/export.mjs --platform cursor
 
 | Output | Purpose |
 |--------|---------|
-| `.cursor/rules/<agent>.mdc` | One `.mdc` rule file per agent |
+| `.cursor/rules/<agent>.mdc` | One `.mdc` rule file per agent or skill |
 
 Cursor loads `.mdc` files from `.cursor/rules/` automatically. Each file has frontmatter with a `description` field so Cursor can select the right rule for the context.
 
